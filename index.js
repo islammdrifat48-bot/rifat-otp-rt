@@ -97,22 +97,19 @@ async function checkChannelMember(userId) {
             'Channel check error:',
             error.message
         );
-
-        // API error হলে access দেওয়া হবে না
         return false;
     }
 }
 
 
 // ===============================
-// MAIN MENU
+// MAIN MENU (Get Active Number Kept)
 // ===============================
 
 const mainMenu = {
     reply_markup: {
         keyboard: [
             [
-                { text: '📱 Get Numbers' },
                 { text: '📱 Get Active Number' }
             ],
             [
@@ -150,13 +147,8 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
         await bot.sendMessage(
             chatId,
 
-            `👋 *RIFAT_SMS* বটের সার্ভিস চালু আছে!
-
-` +
-            `প্যানেল থেকে নম্বর নিতে *Get Numbers* ` +
-            `অথবা আপনার ইনকাম দেখতে *Balance* বাটনে ক্লিক করুন।
-
-` +
+            `👋 *RIFAT_SMS* বটের সার্ভিস চালু আছে!\n\n` +
+            `প্যানেল থেকে নম্বর নিতে *Get Active Number* অথবা আপনার ইনকাম দেখতে *Balance* বাটনে ক্লিক করুন।\n\n` +
             `📌 *Minimum Withdraw: 100 ৳*`,
 
             {
@@ -205,9 +197,7 @@ async function sendBalance(chatId) {
         data.totalWithdrawn;
 
     const balanceMsg =
-        `📊 *আপনার অ্যাকাউন্টের হিসাব:*
-
-` +
+        `📊 *আপনার অ্যাকাউন্টের হিসাব:*\n\n` +
         `🔢 *মোট প্রাপ্ত OTP:* \`${data.totalOtp}\` টি\n` +
         `💵 *মোট ইনকাম:* \`${data.totalEarned.toFixed(2)}\` ৳\n` +
         `🏧 *মোট উত্তোলন:* \`${data.totalWithdrawn.toFixed(2)}\` ৳\n` +
@@ -253,7 +243,6 @@ bot.on('message', async (msg) => {
 
     if (!text) return;
 
-    // /start এবং /stat আলাদা handler-এ আছে
     if (
         text.startsWith('/start') ||
         text.startsWith('/stat')
@@ -261,7 +250,6 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // Locked হলে duplicate request বন্ধ
     if (userLocks[chatId]) {
         return;
     }
@@ -319,11 +307,8 @@ bot.on('message', async (msg) => {
         return bot.sendMessage(
             chatId,
 
-            `🎧 *সাপোর্ট*
-
-` +
-            `যে কোনো সমস্যা বা অনুসন্ধানের জন্য ` +
-            `নিচের বাটনে ক্লিক করে Admin-এর সাথে যোগাযোগ করুন।`,
+            `🎧 *সাপোর্ট*\n\n` +
+            `যে কোনো সমস্যা বা অনুসন্ধানের জন্য নিচের বাটনে ক্লিক করে Admin-এর সাথে যোগাযোগ করুন।`,
 
             {
                 parse_mode: 'Markdown',
@@ -359,9 +344,7 @@ bot.on('message', async (msg) => {
 
                 chatId,
 
-                `⚠️ *উইথড্র করা যাবে না!*
-
-` +
+                `⚠️ *উইথড্র করা যাবে না!*\n\n` +
                 `সর্বনিম্ন Withdraw: *100 ৳*\n` +
                 `💳 বর্তমান ব্যালেন্স: \`${currentBalance.toFixed(2)}\` ৳`,
 
@@ -409,9 +392,7 @@ bot.on('message', async (msg) => {
 
             chatId,
 
-            `💳 *Withdraw Method Select করুন*
-
-` +
+            `💳 *Withdraw Method Select করুন*\n\n` +
             `💰 বর্তমান ব্যালেন্স: \`${currentBalance.toFixed(2)}\` ৳`,
 
             {
@@ -456,9 +437,7 @@ bot.on('message', async (msg) => {
 
                 chatId,
 
-                `❌ *Withdraw ব্যর্থ!*
-
-` +
+                `❌ *Withdraw ব্যর্থ!*\n\n` +
                 `সঠিক amount দিন এবং আপনার balance-এর মধ্যে থাকতে হবে।`,
 
                 {
@@ -481,9 +460,7 @@ bot.on('message', async (msg) => {
 
             chatId,
 
-            `✅ Amount: \`${amount.toFixed(2)}\` ৳
-
-` +
+            `✅ Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
             `এখন আপনার *${userState[chatId].method}* নম্বরটি পাঠান:`,
 
             {
@@ -513,11 +490,6 @@ bot.on('message', async (msg) => {
         const walletNumber =
             text.replace(/[\s-]/g, '');
 
-        const data =
-            getUserData(chatId);
-
-
-        // Basic number validation
         if (!/^\d{10,15}$/.test(walletNumber)) {
 
             return bot.sendMessage(
@@ -527,20 +499,12 @@ bot.on('message', async (msg) => {
 
         }
 
-
-        /*
-         * এখানে সরাসরি balance কাটা হচ্ছে না।
-         * Admin request দেখার পর payment/approval করতে পারবে।
-         */
-
         delete userState[chatId];
-
 
         const username =
             user.username
                 ? '@' + user.username
                 : 'N/A';
-
 
         try {
 
@@ -548,9 +512,7 @@ bot.on('message', async (msg) => {
 
                 chatId,
 
-                `📥 *Withdraw Request গ্রহণ করা হয়েছে!*
-
-` +
+                `📥 *Withdraw Request গ্রহণ করা হয়েছে!*\n\n` +
                 `🔹 Method: ${method}\n` +
                 `📞 Number: \`${walletNumber}\`\n` +
                 `💰 Amount: \`${withdrawAmount.toFixed(2)}\` ৳\n\n` +
@@ -567,9 +529,7 @@ bot.on('message', async (msg) => {
 
                 config.ADMIN_CHAT_ID,
 
-                `📥 *নতুন Withdraw Request*
-
-` +
+                `📥 *নতুন Withdraw Request*\n\n` +
                 `👤 User: ${username}\n` +
                 `🆔 ID: \`${chatId}\`\n` +
                 `💳 Method: ${method}\n` +
@@ -602,11 +562,10 @@ bot.on('message', async (msg) => {
 
 
     // ===========================
-    // GET NUMBERS
+    // GET ACTIVE NUMBER / REFRESH
     // ===========================
 
     if (
-        text === '📱 Get Numbers' ||
         text === '📱 Get Active Number' ||
         text === '🔄 Refresh Panel'
     ) {
@@ -622,10 +581,6 @@ bot.on('message', async (msg) => {
 
         try {
 
-            // -----------------------
-            // CHANNEL CHECK
-            // -----------------------
-
             const isJoined =
                 await checkChannelMember(chatId);
 
@@ -636,10 +591,8 @@ bot.on('message', async (msg) => {
 
                     chatId,
 
-                    `❌ *প্রথমে আমাদের channel-এ join করুন।*
-
-` +
-                    `Channel: ${config.REQUIRED_CHANNEL}`,
+                    `❌ *প্রথমে আমাদের channel-এ join করুন।*` +
+                    `\n\nChannel: ${config.REQUIRED_CHANNEL}`,
 
                     {
                         parse_mode: 'Markdown'
@@ -652,22 +605,14 @@ bot.on('message', async (msg) => {
             }
 
 
-            // -----------------------
-            // LOADING
-            // -----------------------
-
             await bot.sendMessage(
 
                 chatId,
 
-                '⏳ RIFAT_SMS panel থেকে live range check করা হচ্ছে...'
+                '⏳ RIFAT_SMS panel থেকে live active number চেক করা হচ্ছে...'
 
             );
 
-
-            // -----------------------
-            // LIVE DATA
-            // -----------------------
 
             const liveData =
                 await getLiveAccess();
@@ -691,10 +636,6 @@ bot.on('message', async (msg) => {
 
             }
 
-
-            // -----------------------
-            // FIND RANGE
-            // -----------------------
 
             let targetRange = null;
 
@@ -745,10 +686,6 @@ bot.on('message', async (msg) => {
             }
 
 
-            // -----------------------
-            // GET NUMBER
-            // -----------------------
-
             const numResult =
                 await getNewNumber(
                     targetRange
@@ -786,17 +723,13 @@ bot.on('message', async (msg) => {
                 'Unknown';
 
 
-            // -----------------------
-            // SHOW NUMBER
-            // -----------------------
-
             await bot.sendMessage(
 
                 chatId,
 
                 `📍 *দেশ:* ${countryName}\n` +
                 `📞 *নম্বর:* \`${phoneNumber}\`\n\n` +
-                `✅ Number successfully allocated হয়েছে।`,
+                `✅ Active Number successfully allocated হয়েছে।`,
 
                 {
                     parse_mode: 'Markdown'
@@ -834,7 +767,6 @@ bot.on('message', async (msg) => {
 
         } finally {
 
-            // সব অবস্থাতেই lock খুলে যাবে
             userLocks[chatId] = false;
 
         }
@@ -859,17 +791,11 @@ bot.on('callback_query', async (query) => {
             return;
         }
 
-
         const chatId =
             query.message.chat.id;
 
         const data =
             query.data;
-
-
-        // ---------------------------
-        // WITHDRAW METHOD
-        // ---------------------------
 
         if (
             data &&
@@ -879,7 +805,6 @@ bot.on('callback_query', async (query) => {
             const method =
                 data.split('_')[1];
 
-
             userState[chatId] = {
 
                 step: 'AWAITING_AMOUNT',
@@ -887,19 +812,15 @@ bot.on('callback_query', async (query) => {
 
             };
 
-
             await bot.answerCallbackQuery(
                 query.id
             );
-
 
             await bot.sendMessage(
 
                 chatId,
 
-                `📲 *${method}* selected হয়েছে।
-
-` +
+                `📲 *${method}* selected হয়েছে।\n\n` +
                 `কত টাকা Withdraw করতে চান লিখে পাঠান:`,
 
                 {
@@ -943,10 +864,8 @@ const server =
 
     });
 
-
 const PORT =
     process.env.PORT || 10000;
-
 
 server.listen(
     PORT,
