@@ -219,7 +219,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// 1 SECOND INTERVAL OTP CHECKER
+// 1 SECOND INTERVAL OTP CHECKER (WITHOUT TIMEOUT MESSAGE)
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
@@ -230,8 +230,7 @@ async function startFastOtpChecker(chatId, phoneNumber) {
         attempts++;
         if (attempts > maxAttempts) {
             clearInterval(interval);
-            await bot.sendMessage(chatId, `⏰ *Time Out:* No OTP received for \`${phoneNumber}\` within the given time.`).catch(() => {});
-            return;
+            return; // কোনো টাইমআউট মেসেজ পাঠানো হবে না
         }
 
         try {
