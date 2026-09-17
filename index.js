@@ -1,3 +1,18 @@
+bot.on('polling_error', (error) => {
+    console.error('POLLING ERROR:', error.message);
+});
+
+bot.on('error', (error) => {
+    console.error('BOT ERROR:', error.message);
+});
+
+bot.getMe()
+    .then((me) => {
+        console.log('BOT CONNECTED:', me.username);
+    })
+    .catch((err) => {
+        console.error('BOT CONNECTION FAILED:', err.message);
+    });
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 const config = require('./config');
