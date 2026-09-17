@@ -4,7 +4,8 @@ const http = require('http');
 const config = require('./config');
 const {
     getLiveAccess,
-    getNewNumber
+    getNewNumber,
+    getSuccessOtp
 } = require('./api');
 
 const bot = new TelegramBot(config.BOT_TOKEN, {
@@ -143,8 +144,8 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
         await bot.sendMessage(
             chatId,
 
-            `👋 *RIFAT_SMS* বটের সার্ভিস চালু আছে!\n\n` +
-            `প্যানেল থেকে নম্বর নিতে *Get Active Number* অথবা আপনার ইনকাম দেখতে *Balance* বাটনে ক্লিক করুন।\n\n` +
+            `👋 *RIFAT_SMS* Bot service is active!\n\n` +
+            `Click *Get Active Number* to get a number from the panel or click *Balance* to check your earnings.\n\n` +
             `📌 *Minimum Withdraw: 100 ৳*`,
 
             {
@@ -190,13 +191,13 @@ async function sendBalance(chatId) {
         data.totalWithdrawn;
 
     const balanceMsg =
-        `📊 *আপনার অ্যাকাউন্টের হিসাব:*\n\n` +
-        `🔢 *মোট প্রাপ্ত OTP:* \`${data.totalOtp}\` টি\n` +
-        `💵 *মোট ইনকাম:* \`${data.totalEarned.toFixed(2)}\` ৳\n` +
-        `🏧 *মোট উত্তোলন:* \`${data.totalWithdrawn.toFixed(2)}\` ৳\n` +
+        `📊 *Your Account Statement:*\n\n` +
+        `🔢 *Total Received OTP:* \`${data.totalOtp}\`\n` +
+        `💵 *Total Earnings:* \`${data.totalEarned.toFixed(2)}\` ৳\n` +
+        `🏧 *Total Withdrawal:* \`${data.totalWithdrawn.toFixed(2)}\` ৳\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
-        `💳 *বর্তমান ব্যালেন্স:* \`${currentBalance.toFixed(2)}\` ৳\n\n` +
-        `📌 *সর্বনিম্ন Withdraw: 100 ৳*`;
+        `💳 *Current Balance:* \`${currentBalance.toFixed(2)}\` ৳\n\n` +
+        `📌 *Minimum Withdraw: 100 ৳*`;
 
     try {
 
@@ -214,6 +215,70 @@ async function sendBalance(chatId) {
         console.error('Balance error:', error.message);
 
     }
+}
+
+
+// ===============================
+// 1 SECOND INTERVAL OTP CHECKER
+// ===============================
+
+async function startFastOtpChecker(chatId, phoneNumber) {
+    let attempts = 0;
+    const maxAttempts = 180; // Checks for about 3 minutes (every 1 second)
+
+    const interval = setInterval(async () => {
+        attempts++;
+        if (attempts > maxAttempts) {
+            clearInterval(interval);
+            await bot.sendMessage(chatId, `⏰ *Time Out:* No OTP received for \`${phoneNumber}\` within the given time.`).catch(() => {});
+            return;
+        }
+
+        try {
+            const otpResult = await getSuccessOtp();
+            if (otpResult) {
+                const items = otpResult.data || otpResult.items || otpResult;
+                if (Array.isArray(items)) {
+                    for (let item of items) {
+                        const targetNum = item.number || item.phone || item.full_number;
+                        const code = item.otp || item.code || item.sms;
+
+                        if (targetNum && String(targetNum).includes(phoneNumber) && code) {
+                            clearInterval(interval);
+
+                            const userData = getUserData(chatId);
+                            userData.totalOtp += 1;
+                            userData.totalEarned += 5;
+
+                            const otpMsg =
+                                `🎉 *OTP Received Successfully!*\n\n` +
+                                `📞 *Number:* \`${phoneNumber}\`\n` +
+                                `💬 *OTP Code:* \`${code}\`\n\n` +
+                                `✅ OTP successfully received!`;
+
+                            const otpKeyboard = {
+                                reply_markup: {
+                                    inline_keyboard: [
+                                        [
+                                            { text: 'OTP Group', url: 'https://t.me/otpgroup_rt' }
+                                        ]
+                                    ]
+                                }
+                            };
+
+                            await bot.sendMessage(chatId, otpMsg, {
+                                parse_mode: 'Markdown',
+                                ...otpKeyboard
+                            });
+                            return;
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Fast OTP Check error:', err.message);
+        }
+    }, 1000);
 }
 
 
@@ -293,8 +358,8 @@ bot.on('message', async (msg) => {
         return bot.sendMessage(
             chatId,
 
-            `🎧 *সাপোর্ট*\n\n` +
-            `যে কোনো সমস্যা বা অনুসন্ধানের জন্য নিচের বাটনে ক্লিক করে Admin-এর সাথে যোগাযোগ করুন।`,
+            `🎧 *Support*\n\n` +
+            `For any issues or inquiries, click the button below to contact the Admin.`,
 
             {
                 parse_mode: 'Markdown',
@@ -351,9 +416,9 @@ bot.on('message', async (msg) => {
 
             chatId,
 
-            `💳 *Withdraw Method Select করুন*\n\n` +
-            `💰 বর্তমান ব্যালেন্স: \`${currentBalance.toFixed(2)}\` ৳\n` +
-            `📌 সর্বনিম্ন Withdraw: *100 ৳*`,
+            `💳 *Select Withdraw Method*\n\n` +
+            `💰 Current Balance: \`${currentBalance.toFixed(2)}\` ৳\n` +
+            `📌 Minimum Withdraw: *100 ৳*`,
 
             {
                 parse_mode: 'Markdown',
@@ -381,7 +446,7 @@ bot.on('message', async (msg) => {
 
             return bot.sendMessage(
                 chatId,
-                `❌ সঠিক ${method} নম্বর দিন।`
+                `❌ Please provide a valid ${method} number.`
             );
 
         }
@@ -391,8 +456,8 @@ bot.on('message', async (msg) => {
 
         return bot.sendMessage(
             chatId,
-            `📲 নম্বর গ্রহণ করা হয়েছে: \`${walletNumber}\`\n\n` +
-            `এখন কত টাকা Withdraw করতে চান *টাকার পরিমাণ* লিখে পাঠান:`,
+            `📲 Number accepted: \`${walletNumber}\`\n\n` +
+            `Now send the *amount of money* you want to withdraw:`,
             {
                 parse_mode: 'Markdown'
             }
@@ -415,7 +480,7 @@ bot.on('message', async (msg) => {
         if (!Number.isFinite(amount) || amount < MIN_WITHDRAW_AMOUNT) {
             return bot.sendMessage(
                 chatId,
-                `❌ সর্বনিম্ন Withdraw পরিমাণ হলো *100 ৳*। সঠিক পরিমাণ লিখুন:`
+                `❌ Minimum withdraw amount is *100 ৳*. Enter the correct amount:`
             );
         }
 
@@ -435,11 +500,11 @@ bot.on('message', async (msg) => {
 
         return bot.sendMessage(
             chatId,
-            `⚠️ *Withdraw কনফার্ম করুন*\n\n` +
+            `⚠️ *Confirm Withdraw*\n\n` +
             `🔹 Method: ${userState[chatId].method}\n` +
             `📞 Number: \`${userState[chatId].walletNumber}\`\n` +
             `💰 Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
-            `নিচের বাটনে ক্লিক করে কনফার্ম করুন:`,
+            `Click the button below to confirm:`,
             {
                 parse_mode: 'Markdown',
                 ...confirmKeyboard
@@ -472,7 +537,7 @@ bot.on('message', async (msg) => {
             if (!isJoined) {
                 await bot.sendMessage(
                     chatId,
-                    `❌ *প্রথমে আমাদের channel-এ join করুন।*` +
+                    `❌ *Please join our channel first.*` +
                     `\n\nChannel: ${config.REQUIRED_CHANNEL}`,
                     { parse_mode: 'Markdown' }
                 );
@@ -481,7 +546,7 @@ bot.on('message', async (msg) => {
 
             await bot.sendMessage(
                 chatId,
-                '⏳ RIFAT_SMS panel থেকে live active number চেক করা হচ্ছে...'
+                '⏳ Checking live active number from RIFAT_SMS panel...'
             );
 
             const liveData = await getLiveAccess();
@@ -493,7 +558,7 @@ bot.on('message', async (msg) => {
             ) {
                 return bot.sendMessage(
                     chatId,
-                    '❌ Panel থেকে কোনো valid data পাওয়া যায়নি।'
+                    '❌ No valid data received from the panel.'
                 );
             }
 
@@ -512,7 +577,7 @@ bot.on('message', async (msg) => {
             if (!targetRange) {
                 return bot.sendMessage(
                     chatId,
-                    'ℹ️ বর্তমানে কোনো active range পাওয়া যায়নি।'
+                    'ℹ️ No active range available at the moment.'
                 );
             }
 
@@ -521,7 +586,7 @@ bot.on('message', async (msg) => {
             if (!numResult || !numResult.data) {
                 return bot.sendMessage(
                     chatId,
-                    '❌ Number allocate করতে ব্যর্থ হয়েছে।'
+                    '❌ Failed to allocate number.'
                 );
             }
 
@@ -529,11 +594,13 @@ bot.on('message', async (msg) => {
             const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
             const countryName = phoneData.country || 'Unknown';
 
+            startFastOtpChecker(chatId, phoneNumber);
+
             await bot.sendMessage(
                 chatId,
-                `📍 *দেশ:* ${countryName}\n` +
-                `📞 *নম্বর:* \`${phoneNumber}\`\n\n` +
-                `✅ Active Number successfully allocated হয়েছে।`,
+                `📍 *Country:* ${countryName}\n` +
+                `📞 *Number:* \`${phoneNumber}\`\n\n` +
+                `✅ Active Number successfully allocated.`,
                 { parse_mode: 'Markdown' }
             );
 
@@ -542,7 +609,7 @@ bot.on('message', async (msg) => {
             try {
                 await bot.sendMessage(
                     chatId,
-                    '❌ একটি technical error হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।'
+                    '❌ A technical error occurred. Please try again later.'
                 );
             } catch (sendError) {
                 console.error('ERROR MESSAGE SEND FAILED:', sendError.message);
@@ -572,7 +639,6 @@ bot.on('callback_query', async (query) => {
         const data = query.data;
         const user = query.from;
 
-        // ১. মেথড সিলেক্ট করার অংশ
         if (data && data.startsWith('withdraw_')) {
 
             const method = data.split('_')[1];
@@ -586,8 +652,8 @@ bot.on('callback_query', async (query) => {
 
             await bot.sendMessage(
                 chatId,
-                `📲 *${method}* সিলেক্ট করা হয়েছে।\n\n` +
-                `এখন আপনার পেমেন্ট পাওয়ার জন্য *${method} নম্বরটি* লিখে পাঠান:`,
+                `📲 *${method}* selected.\n\n` +
+                `Now send your *${method} number* to receive payment:`,
                 {
                     parse_mode: 'Markdown'
                 }
@@ -595,11 +661,10 @@ bot.on('callback_query', async (query) => {
 
         }
 
-        // ২. কনফার্মেশন প্রসেস করার অংশ
         if (data === 'confirm_withdraw') {
 
             if (!userState[chatId] || userState[chatId].step !== 'AWAITING_CONFIRMATION') {
-                await bot.answerCallbackQuery(query.id, { text: 'সেশন মেয়াদোত্তীর্ণ হয়েছে।' });
+                await bot.answerCallbackQuery(query.id, { text: 'Session expired.' });
                 return;
             }
 
@@ -607,21 +672,19 @@ bot.on('callback_query', async (query) => {
             const userData = getUserData(chatId);
             const currentBalance = userData.totalEarned - userData.totalWithdrawn;
 
-            // কনফার্ম করার সময় ব্যালেন্স কম বা ভুল থাকলে ফেইল দেখাবে
             if (amount > currentBalance) {
                 delete userState[chatId];
                 await bot.answerCallbackQuery(query.id);
                 return bot.sendMessage(
                     chatId,
-                    `❌ *Withdraw ফেইল হয়েছে!*\n\n` +
-                    `আপনার পর্যাপ্ত ব্যালেন্স নেই।\n` +
-                    `💳 বর্তমান ব্যালেন্স: \`${currentBalance.toFixed(2)}\` ৳\n` +
-                    `💰 উইথড্র পরিমাণ: \`${amount.toFixed(2)}\` ৳`,
+                    `❌ *Withdraw Failed!*\n\n` +
+                    `You do not have sufficient balance.\n` +
+                    `💳 Current Balance: \`${currentBalance.toFixed(2)}\` ৳\n` +
+                    `💰 Withdraw Amount: \`${amount.toFixed(2)}\` ৳`,
                     { parse_mode: 'Markdown' }
                 );
             }
 
-            // ব্যালেন্স পর্যাপ্ত থাকলে সফল হবে এবং ব্যালেন্স কেটে নেওয়া হবে
             userData.totalWithdrawn += amount;
             delete userState[chatId];
 
@@ -629,21 +692,19 @@ bot.on('callback_query', async (query) => {
 
             await bot.answerCallbackQuery(query.id, { text: 'Withdraw Successful!' });
 
-            // ইউজারের কাছে সাকসেস মেসেজ
             await bot.sendMessage(
                 chatId,
-                `✅ *Withdraw Request সফলভাবে জমা হয়েছে!*\n\n` +
+                `✅ *Withdraw Request submitted successfully!*\n\n` +
                 `🔹 Method: ${method}\n` +
                 `📞 Number: \`${walletNumber}\`\n` +
                 `💰 Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
-                `⏳ Admin যাচাই করার পর দ্রুত পেমেন্ট পাঠিয়ে দেওয়া হবে।`,
+                `⏳ Payment will be sent soon after Admin verification.`,
                 { parse_mode: 'Markdown' }
             );
 
-            // এডমিনের কাছে রিকোয়েস্ট মেসেজ
             await bot.sendMessage(
                 config.ADMIN_CHAT_ID,
-                `📥 *নতুন Withdraw Request (Success)*\n\n` +
+                `📥 *New Withdraw Request (Success)*\n\n` +
                 `👤 User: ${username}\n` +
                 `🆔 ID: \`${chatId}\`\n` +
                 `💳 Method: ${method}\n` +
@@ -654,11 +715,10 @@ bot.on('callback_query', async (query) => {
 
         }
 
-        // ৩. ক্যানসেল করার অংশ
         if (data === 'cancel_withdraw') {
             delete userState[chatId];
             await bot.answerCallbackQuery(query.id, { text: 'Withdraw Cancelled' });
-            await bot.sendMessage(chatId, '❌ Withdraw রিকোয়েস্ট বাতিল করা হয়েছে।');
+            await bot.sendMessage(chatId, '❌ Withdraw request has been cancelled.');
         }
 
     } catch (error) {
