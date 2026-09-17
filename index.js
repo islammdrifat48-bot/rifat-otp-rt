@@ -250,8 +250,7 @@ bot.on('message', async (msg) => {
     // ===========================
 
     if (
-        text === '💰 Balance' ||
-        text === 'Balance' ||
+        text.includes('Balance') ||
         text.toLowerCase() === 'stat'
     ) {
 
@@ -264,10 +263,7 @@ bot.on('message', async (msg) => {
     // SUPPORT
     // ===========================
 
-    if (
-        text === '💬 Support' ||
-        text === 'Support'
-    ) {
+    if (text.includes('Support')) {
 
         delete userState[chatId];
 
@@ -313,39 +309,12 @@ bot.on('message', async (msg) => {
     // WITHDRAW BUTTON CLICK
     // ===========================
 
-    if (
-        text === '💸 Withdraw' ||
-        text === 'Withdraw' ||
-        text === '💳 Withdraw'
-    ) {
+    if (text.includes('Withdraw') || text.includes('💸')) {
 
         delete userState[chatId];
 
         const data = getUserData(chatId);
-
-        const currentBalance =
-            data.totalEarned -
-            data.totalWithdrawn;
-
-
-        if (currentBalance < MIN_WITHDRAW_AMOUNT) {
-
-            return bot.sendMessage(
-
-                chatId,
-
-                `⚠️ *উইথড্র করা যাবে না!*\n\n` +
-                `সর্বনিম্ন Withdraw: *100 ৳*\n` +
-                `💳 বর্তমান ব্যালেন্স: \`${currentBalance.toFixed(2)}\` ৳`,
-
-                {
-                    parse_mode: 'Markdown'
-                }
-
-            );
-
-        }
-
+        const currentBalance = data.totalEarned - data.totalWithdrawn;
 
         const withdrawMethods = {
 
@@ -383,7 +352,8 @@ bot.on('message', async (msg) => {
             chatId,
 
             `💳 *Withdraw Method Select করুন*\n\n` +
-            `💰 বর্তমান ব্যালেন্স: \`${currentBalance.toFixed(2)}\` ৳`,
+            `💰 বর্তমান ব্যালেন্স: \`${currentBalance.toFixed(2)}\` ৳\n` +
+            `📌 সর্বনিম্ন Withdraw: *100 ৳*`,
 
             {
                 parse_mode: 'Markdown',
@@ -432,7 +402,7 @@ bot.on('message', async (msg) => {
 
 
     // ===========================
-    // STEP 2: RECEIVE AMOUNT & PROCESS
+    // STEP 2: RECEIVE AMOUNT & ASK CONFIRMATION
     // ===========================
 
     if (
@@ -441,75 +411,40 @@ bot.on('message', async (msg) => {
     ) {
 
         const amount = Number(text.replace(/,/g, ''));
-        const method = userState[chatId].method;
-        const walletNumber = userState[chatId].walletNumber;
 
-        const data = getUserData(chatId);
-        const currentBalance = data.totalEarned - data.totalWithdrawn;
-
-        // ব্যালেন্স বা পরিমাণ ঠিক না থাকলে ফেল দেখাবে এবং এডমিনের কাছে যাবে না
-        if (
-            !Number.isFinite(amount) ||
-            amount < MIN_WITHDRAW_AMOUNT ||
-            amount > currentBalance
-        ) {
-
-            delete userState[chatId];
-
+        if (!Number.isFinite(amount) || amount < MIN_WITHDRAW_AMOUNT) {
             return bot.sendMessage(
                 chatId,
-                `❌ *Withdraw ফেইল হয়েছে!*\n\n` +
-                `আপনার পর্যাপ্ত ব্যালেন্স নেই অথবা সঠিক পরিমাণ প্রদান করেননি।\n` +
-                `💳 বর্তমান ব্যালেন্স: \`${currentBalance.toFixed(2)}\` ৳\n` +
-                `📌 সর্বনিম্ন Withdraw: *100 ৳*`,
-                {
-                    parse_mode: 'Markdown'
-                }
+                `❌ সর্বনিম্ন Withdraw পরিমাণ হলো *100 ৳*। সঠিক পরিমাণ লিখুন:`
             );
-
         }
 
-        // সফল হলে উইথড্র অ্যামাউন্ট ব্যালেন্স থেকে মাইনাস হবে
-        data.totalWithdrawn += amount;
-        delete userState[chatId];
+        userState[chatId].amount = amount;
+        userState[chatId].step = 'AWAITING_CONFIRMATION';
 
-        const username = user.username ? '@' + user.username : 'N/A';
+        const confirmKeyboard = {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: '✅ Confirm Withdraw', callback_data: 'confirm_withdraw' },
+                        { text: '❌ Cancel', callback_data: 'cancel_withdraw' }
+                    ]
+                ]
+            }
+        };
 
-        try {
-
-            // ইউজারের কাছে সফল মেসেজ
-            await bot.sendMessage(
-                chatId,
-                `✅ *Withdraw Request সফলভাবে জমা হয়েছে!*\n\n` +
-                `🔹 Method: ${method}\n` +
-                `📞 Number: \`${walletNumber}\`\n` +
-                `💰 Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
-                `⏳ Admin যাচাই করার পর দ্রুত পেমেন্ট পাঠিয়ে দেওয়া হবে।`,
-                {
-                    parse_mode: 'Markdown'
-                }
-            );
-
-            // এডমিনের কাছে রিকোয়েস্ট মেসেজ
-            await bot.sendMessage(
-                config.ADMIN_CHAT_ID,
-                `📥 *নতুন Withdraw Request*\n\n` +
-                `👤 User: ${username}\n` +
-                `🆔 ID: \`${chatId}\`\n` +
-                `💳 Method: ${method}\n` +
-                `📞 Number: \`${walletNumber}\`\n` +
-                `💰 Amount: \`${amount.toFixed(2)}\` ৳`,
-                {
-                    parse_mode: 'Markdown'
-                }
-            );
-
-        } catch (error) {
-            console.error('Withdraw send error:', error.message);
-            return bot.sendMessage(chatId, '❌ Request পাঠাতে সমস্যা হয়েছে।');
-        }
-
-        return;
+        return bot.sendMessage(
+            chatId,
+            `⚠️ *Withdraw কনফার্ম করুন*\n\n` +
+            `🔹 Method: ${userState[chatId].method}\n` +
+            `📞 Number: \`${userState[chatId].walletNumber}\`\n` +
+            `💰 Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
+            `নিচের বাটনে ক্লিক করে কনফার্ম করুন:`,
+            {
+                parse_mode: 'Markdown',
+                ...confirmKeyboard
+            }
+        );
 
     }
 
@@ -519,8 +454,8 @@ bot.on('message', async (msg) => {
     // ===========================
 
     if (
-        text === '📱 Get Active Number' ||
-        text === '🔄 Refresh Panel'
+        text.includes('Get Active Number') ||
+        text.includes('Refresh Panel')
     ) {
 
         if (userLocks[chatId]) {
@@ -622,7 +557,7 @@ bot.on('message', async (msg) => {
 
 
 // ===============================
-// CALLBACK QUERY (METHOD SELECTION)
+// CALLBACK QUERY (METHOD & CONFIRMATION)
 // ===============================
 
 bot.on('callback_query', async (query) => {
@@ -635,12 +570,13 @@ bot.on('callback_query', async (query) => {
 
         const chatId = query.message.chat.id;
         const data = query.data;
+        const user = query.from;
 
+        // ১. মেথড সিলেক্ট করার অংশ
         if (data && data.startsWith('withdraw_')) {
 
             const method = data.split('_')[1];
 
-            // প্রথমে মেথড সিলেক্ট করার পর নম্বর চাওয়ার স্টেপ সেট করা হলো
             userState[chatId] = {
                 step: 'AWAITING_NUMBER',
                 method: method
@@ -657,6 +593,72 @@ bot.on('callback_query', async (query) => {
                 }
             );
 
+        }
+
+        // ২. কনফার্মেশন প্রসেস করার অংশ
+        if (data === 'confirm_withdraw') {
+
+            if (!userState[chatId] || userState[chatId].step !== 'AWAITING_CONFIRMATION') {
+                await bot.answerCallbackQuery(query.id, { text: 'সেশন মেয়াদোত্তীর্ণ হয়েছে।' });
+                return;
+            }
+
+            const { method, walletNumber, amount } = userState[chatId];
+            const userData = getUserData(chatId);
+            const currentBalance = userData.totalEarned - userData.totalWithdrawn;
+
+            // কনফার্ম করার সময় ব্যালেন্স কম বা ভুল থাকলে ফেইল দেখাবে
+            if (amount > currentBalance) {
+                delete userState[chatId];
+                await bot.answerCallbackQuery(query.id);
+                return bot.sendMessage(
+                    chatId,
+                    `❌ *Withdraw ফেইল হয়েছে!*\n\n` +
+                    `আপনার পর্যাপ্ত ব্যালেন্স নেই।\n` +
+                    `💳 বর্তমান ব্যালেন্স: \`${currentBalance.toFixed(2)}\` ৳\n` +
+                    `💰 উইথড্র পরিমাণ: \`${amount.toFixed(2)}\` ৳`,
+                    { parse_mode: 'Markdown' }
+                );
+            }
+
+            // ব্যালেন্স পর্যাপ্ত থাকলে সফল হবে এবং ব্যালেন্স কেটে নেওয়া হবে
+            userData.totalWithdrawn += amount;
+            delete userState[chatId];
+
+            const username = user.username ? '@' + user.username : 'N/A';
+
+            await bot.answerCallbackQuery(query.id, { text: 'Withdraw Successful!' });
+
+            // ইউজারের কাছে সাকসেস মেসেজ
+            await bot.sendMessage(
+                chatId,
+                `✅ *Withdraw Request সফলভাবে জমা হয়েছে!*\n\n` +
+                `🔹 Method: ${method}\n` +
+                `📞 Number: \`${walletNumber}\`\n` +
+                `💰 Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
+                `⏳ Admin যাচাই করার পর দ্রুত পেমেন্ট পাঠিয়ে দেওয়া হবে।`,
+                { parse_mode: 'Markdown' }
+            );
+
+            // এডমিনের কাছে রিকোয়েস্ট মেসেজ
+            await bot.sendMessage(
+                config.ADMIN_CHAT_ID,
+                `📥 *নতুন Withdraw Request (Success)*\n\n` +
+                `👤 User: ${username}\n` +
+                `🆔 ID: \`${chatId}\`\n` +
+                `💳 Method: ${method}\n` +
+                `📞 Number: \`${walletNumber}\`\n` +
+                `💰 Amount: \`${amount.toFixed(2)}\` ৳`,
+                { parse_mode: 'Markdown' }
+            );
+
+        }
+
+        // ৩. ক্যানসেল করার অংশ
+        if (data === 'cancel_withdraw') {
+            delete userState[chatId];
+            await bot.answerCallbackQuery(query.id, { text: 'Withdraw Cancelled' });
+            await bot.sendMessage(chatId, '❌ Withdraw রিকোয়েস্ট বাতিল করা হয়েছে।');
         }
 
     } catch (error) {
