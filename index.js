@@ -481,45 +481,23 @@ bot.on('message', async (msg) => {
 
             await bot.sendMessage(
                 chatId,
-                '⏳ RIFAT_SMS panel থেকে live active number চেক করা হচ্ছে...'
+                '⏳ RIFAT_SMS panel থেকে নম্বর নিয়ে আসা হচ্ছে...'
             );
 
-            const liveData = await getLiveAccess();
+            // সরাসরি প্যানেল থেকে নম্বর আনার জন্য রিকোয়েস্ট পাঠানো হচ্ছে
+            const numResult = await getNewNumber();
 
-            console.log('Live Access Response:', JSON.stringify(liveData));
-
-            if (!liveData) {
-                return bot.sendMessage(
-                    chatId,
-                    '❌ Panel থেকে কোনো response পাওয়া যায়নি।'
-                );
-            }
-
-            let targetRange = null;
-
-            if (Array.isArray(liveData)) {
-                targetRange = liveData[0];
-            } else if (liveData.data) {
-                if (Array.isArray(liveData.data)) {
-                    targetRange = liveData.data[0];
-                } else if (typeof liveData.data === 'object') {
-                    targetRange = liveData.data.rid || liveData.data.range || liveData.data.id;
-                }
-            } else if (liveData.rid || liveData.range) {
-                targetRange = liveData.rid || liveData.range;
-            }
-
-            const numResult = await getNewNumber(targetRange);
+            console.log('Get Number Response:', JSON.stringify(numResult));
 
             if (!numResult) {
                 return bot.sendMessage(
                     chatId,
-                    '❌ সার্ভার থেকে নতুন নম্বর allocate করতে ব্যর্থ হয়েছে।'
+                    '❌ প্যানেল থেকে কোনো response পাওয়া যায়নি।'
                 );
             }
 
             const phoneData = numResult.data || numResult;
-            const phoneNumber = phoneData.full_number || phoneData.number || phoneData.phone || 'N/A';
+            const phoneNumber = phoneData.full_number || phoneData.number || phoneData.phone || phoneData.tel || 'N/A';
             const countryName = phoneData.country || phoneData.operator || 'Unknown';
 
             if (phoneNumber === 'N/A') {
@@ -531,9 +509,9 @@ bot.on('message', async (msg) => {
 
             await bot.sendMessage(
                 chatId,
-                `📍 *দেশ/অপারেটর:* ${countryName}\n` +
+                `📍 *অপারেটর/দেশ:* ${countryName}\n` +
                 `📞 *নম্বর:* \`${phoneNumber}\`\n\n` +
-                `✅ Active Number successfully allocated হয়েছে।`,
+                `✅ Active Number successfully allocate হয়েছে।`,
                 { parse_mode: 'Markdown' }
             );
 
