@@ -447,7 +447,7 @@ bot.on('message', async (msg) => {
         const data = getUserData(chatId);
         const currentBalance = data.totalEarned - data.totalWithdrawn;
 
-        // ব্যালেন্স বা পরিমাণ ঠিক না থাকলে ফেল দেখাবে
+        // ব্যালেন্স বা পরিমাণ ঠিক না থাকলে ফেল দেখাবে এবং এডমিনের কাছে যাবে না
         if (
             !Number.isFinite(amount) ||
             amount < MIN_WITHDRAW_AMOUNT ||
@@ -469,7 +469,7 @@ bot.on('message', async (msg) => {
 
         }
 
-        // সফল হলে ব্যালেন্স আপডেট করে দেওয়া বা রিকোয়েস্ট প্রসেস করা
+        // সফল হলে উইথড্র অ্যামাউন্ট ব্যালেন্স থেকে মাইনাস হবে
         data.totalWithdrawn += amount;
         delete userState[chatId];
 
@@ -477,7 +477,7 @@ bot.on('message', async (msg) => {
 
         try {
 
-            // ইউজারের কাছে সাকসেস মেসেজ
+            // ইউজারের কাছে সফল মেসেজ
             await bot.sendMessage(
                 chatId,
                 `✅ *Withdraw Request সফলভাবে জমা হয়েছে!*\n\n` +
@@ -493,7 +493,7 @@ bot.on('message', async (msg) => {
             // এডমিনের কাছে রিকোয়েস্ট মেসেজ
             await bot.sendMessage(
                 config.ADMIN_CHAT_ID,
-                `📥 *নতুন Withdraw Request (Success)*\n\n` +
+                `📥 *নতুন Withdraw Request*\n\n` +
                 `👤 User: ${username}\n` +
                 `🆔 ID: \`${chatId}\`\n` +
                 `💳 Method: ${method}\n` +
