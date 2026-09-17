@@ -103,7 +103,7 @@ async function checkChannelMember(userId) {
 
 
 // ===============================
-// MAIN MENU (Get Active Number Kept)
+// MAIN MENU
 // ===============================
 
 const mainMenu = {
@@ -138,10 +138,6 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
 
     getUserData(chatId);
 
-    console.log(
-        `/start received from user: ${chatId}`
-    );
-
     try {
 
         await bot.sendMessage(
@@ -159,10 +155,7 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
 
     } catch (error) {
 
-        console.error(
-            'START SEND ERROR:',
-            error.message
-        );
+        console.error('START SEND ERROR:', error.message);
 
     }
 
@@ -218,10 +211,7 @@ async function sendBalance(chatId) {
 
     } catch (error) {
 
-        console.error(
-            'Balance error:',
-            error.message
-        );
+        console.error('Balance error:', error.message);
 
     }
 }
@@ -320,7 +310,7 @@ bot.on('message', async (msg) => {
 
 
     // ===========================
-    // WITHDRAW
+    // WITHDRAW BUTTON CLICK
     // ===========================
 
     if (
@@ -406,74 +396,7 @@ bot.on('message', async (msg) => {
 
 
     // ===========================
-    // WITHDRAW AMOUNT
-    // ===========================
-
-    if (
-        userState[chatId] &&
-        userState[chatId].step === 'AWAITING_AMOUNT'
-    ) {
-
-        const amount =
-            Number(text.replace(/,/g, ''));
-
-        const data =
-            getUserData(chatId);
-
-        const currentBalance =
-            data.totalEarned -
-            data.totalWithdrawn;
-
-
-        if (
-            !Number.isFinite(amount) ||
-            amount < MIN_WITHDRAW_AMOUNT ||
-            amount > currentBalance
-        ) {
-
-            delete userState[chatId];
-
-            return bot.sendMessage(
-
-                chatId,
-
-                `❌ *Withdraw ব্যর্থ!*\n\n` +
-                `সঠিক amount দিন এবং আপনার balance-এর মধ্যে থাকতে হবে।`,
-
-                {
-                    parse_mode: 'Markdown'
-                }
-
-            );
-
-        }
-
-
-        userState[chatId].amount =
-            Number(amount.toFixed(2));
-
-        userState[chatId].step =
-            'AWAITING_NUMBER';
-
-
-        return bot.sendMessage(
-
-            chatId,
-
-            `✅ Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
-            `এখন আপনার *${userState[chatId].method}* নম্বরটি পাঠান:`,
-
-            {
-                parse_mode: 'Markdown'
-            }
-
-        );
-
-    }
-
-
-    // ===========================
-    // WITHDRAW NUMBER
+    // STEP 1: RECEIVE WALLET NUMBER
     // ===========================
 
     if (
@@ -481,14 +404,8 @@ bot.on('message', async (msg) => {
         userState[chatId].step === 'AWAITING_NUMBER'
     ) {
 
-        const method =
-            userState[chatId].method;
-
-        const withdrawAmount =
-            userState[chatId].amount;
-
-        const walletNumber =
-            text.replace(/[\s-]/g, '');
+        const method = userState[chatId].method;
+        const walletNumber = text.replace(/[\s-]/g, '');
 
         if (!/^\d{10,15}$/.test(walletNumber)) {
 
@@ -499,61 +416,97 @@ bot.on('message', async (msg) => {
 
         }
 
-        delete userState[chatId];
+        userState[chatId].walletNumber = walletNumber;
+        userState[chatId].step = 'AWAITING_AMOUNT';
 
-        const username =
-            user.username
-                ? '@' + user.username
-                : 'N/A';
+        return bot.sendMessage(
+            chatId,
+            `📲 নম্বর গ্রহণ করা হয়েছে: \`${walletNumber}\`\n\n` +
+            `এখন কত টাকা Withdraw করতে চান *টাকার পরিমাণ* লিখে পাঠান:`,
+            {
+                parse_mode: 'Markdown'
+            }
+        );
 
-        try {
+    }
 
-            await bot.sendMessage(
 
+    // ===========================
+    // STEP 2: RECEIVE AMOUNT & PROCESS
+    // ===========================
+
+    if (
+        userState[chatId] &&
+        userState[chatId].step === 'AWAITING_AMOUNT'
+    ) {
+
+        const amount = Number(text.replace(/,/g, ''));
+        const method = userState[chatId].method;
+        const walletNumber = userState[chatId].walletNumber;
+
+        const data = getUserData(chatId);
+        const currentBalance = data.totalEarned - data.totalWithdrawn;
+
+        // ব্যালেন্স বা পরিমাণ ঠিক না থাকলে ফেল দেখাবে
+        if (
+            !Number.isFinite(amount) ||
+            amount < MIN_WITHDRAW_AMOUNT ||
+            amount > currentBalance
+        ) {
+
+            delete userState[chatId];
+
+            return bot.sendMessage(
                 chatId,
-
-                `📥 *Withdraw Request গ্রহণ করা হয়েছে!*\n\n` +
-                `🔹 Method: ${method}\n` +
-                `📞 Number: \`${walletNumber}\`\n` +
-                `💰 Amount: \`${withdrawAmount.toFixed(2)}\` ৳\n\n` +
-                `⏳ Admin যাচাই করার পর payment করা হবে।`,
-
+                `❌ *Withdraw ফেইল হয়েছে!*\n\n` +
+                `আপনার পর্যাপ্ত ব্যালেন্স নেই অথবা সঠিক পরিমাণ প্রদান করেননি।\n` +
+                `💳 বর্তমান ব্যালেন্স: \`${currentBalance.toFixed(2)}\` ৳\n` +
+                `📌 সর্বনিম্ন Withdraw: *100 ৳*`,
                 {
                     parse_mode: 'Markdown'
                 }
-
             );
 
+        }
 
+        // সফল হলে ব্যালেন্স আপডেট করে দেওয়া বা রিকোয়েস্ট প্রসেস করা
+        data.totalWithdrawn += amount;
+        delete userState[chatId];
+
+        const username = user.username ? '@' + user.username : 'N/A';
+
+        try {
+
+            // ইউজারের কাছে সাকসেস মেসেজ
             await bot.sendMessage(
+                chatId,
+                `✅ *Withdraw Request সফলভাবে জমা হয়েছে!*\n\n` +
+                `🔹 Method: ${method}\n` +
+                `📞 Number: \`${walletNumber}\`\n` +
+                `💰 Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
+                `⏳ Admin যাচাই করার পর দ্রুত পেমেন্ট পাঠিয়ে দেওয়া হবে।`,
+                {
+                    parse_mode: 'Markdown'
+                }
+            );
 
+            // এডমিনের কাছে রিকোয়েস্ট মেসেজ
+            await bot.sendMessage(
                 config.ADMIN_CHAT_ID,
-
-                `📥 *নতুন Withdraw Request*\n\n` +
+                `📥 *নতুন Withdraw Request (Success)*\n\n` +
                 `👤 User: ${username}\n` +
                 `🆔 ID: \`${chatId}\`\n` +
                 `💳 Method: ${method}\n` +
                 `📞 Number: \`${walletNumber}\`\n` +
-                `💰 Amount: \`${withdrawAmount.toFixed(2)}\` ৳`,
-
+                `💰 Amount: \`${amount.toFixed(2)}\` ৳`,
                 {
                     parse_mode: 'Markdown'
                 }
-
             );
 
         } catch (error) {
-
-            console.error(
-                'Withdraw send error:',
-                error.message
-            );
-
-            return bot.sendMessage(
-                chatId,
-                '❌ Request পাঠাতে সমস্যা হয়েছে।'
-            );
-
+            console.error('Withdraw send error:', error.message);
+            return bot.sendMessage(chatId, '❌ Request পাঠাতে সমস্যা হয়েছে।');
         }
 
         return;
@@ -575,200 +528,92 @@ bot.on('message', async (msg) => {
         }
 
         userLocks[chatId] = true;
-
         delete userState[chatId];
-
 
         try {
 
-            const isJoined =
-                await checkChannelMember(chatId);
-
+            const isJoined = await checkChannelMember(chatId);
 
             if (!isJoined) {
-
                 await bot.sendMessage(
-
                     chatId,
-
                     `❌ *প্রথমে আমাদের channel-এ join করুন।*` +
                     `\n\nChannel: ${config.REQUIRED_CHANNEL}`,
-
-                    {
-                        parse_mode: 'Markdown'
-                    }
-
+                    { parse_mode: 'Markdown' }
                 );
-
                 return;
-
             }
 
-
             await bot.sendMessage(
-
                 chatId,
-
                 '⏳ RIFAT_SMS panel থেকে live active number চেক করা হচ্ছে...'
-
             );
 
-
-            const liveData =
-                await getLiveAccess();
-
+            const liveData = await getLiveAccess();
 
             if (
                 !liveData ||
                 !liveData.data ||
-                !Array.isArray(
-                    liveData.data.services
-                )
+                !Array.isArray(liveData.data.services)
             ) {
-
                 return bot.sendMessage(
-
                     chatId,
-
                     '❌ Panel থেকে কোনো valid data পাওয়া যায়নি।'
-
                 );
-
             }
-
 
             let targetRange = null;
 
-
-            for (
-                const service
-                of liveData.data.services
-            ) {
-
-                if (
-                    service.ranges &&
-                    service.ranges.length > 0
-                ) {
-
-                    const cleaned =
-                        String(
-                            service.ranges[0]
-                        ).replace(
-                            /[^0-9]/g,
-                            ''
-                        );
-
-
+            for (const service of liveData.data.services) {
+                if (service.ranges && service.ranges.length > 0) {
+                    const cleaned = String(service.ranges[0]).replace(/[^0-9]/g, '');
                     if (cleaned) {
-
-                        targetRange =
-                            cleaned;
-
+                        targetRange = cleaned;
                         break;
-
                     }
-
                 }
-
             }
-
 
             if (!targetRange) {
-
                 return bot.sendMessage(
-
                     chatId,
-
                     'ℹ️ বর্তমানে কোনো active range পাওয়া যায়নি।'
-
                 );
-
             }
 
+            const numResult = await getNewNumber(targetRange);
 
-            const numResult =
-                await getNewNumber(
-                    targetRange
-                );
-
-
-            if (
-                !numResult ||
-                !numResult.data
-            ) {
-
+            if (!numResult || !numResult.data) {
                 return bot.sendMessage(
-
                     chatId,
-
                     '❌ Number allocate করতে ব্যর্থ হয়েছে।'
-
                 );
-
             }
 
-
-            const phoneData =
-                numResult.data;
-
-
-            const phoneNumber =
-                phoneData.full_number ||
-                phoneData.number ||
-                'N/A';
-
-
-            const countryName =
-                phoneData.country ||
-                'Unknown';
-
+            const phoneData = numResult.data;
+            const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
+            const countryName = phoneData.country || 'Unknown';
 
             await bot.sendMessage(
-
                 chatId,
-
                 `📍 *দেশ:* ${countryName}\n` +
                 `📞 *নম্বর:* \`${phoneNumber}\`\n\n` +
                 `✅ Active Number successfully allocated হয়েছে।`,
-
-                {
-                    parse_mode: 'Markdown'
-                }
-
+                { parse_mode: 'Markdown' }
             );
-
 
         } catch (error) {
-
-            console.error(
-                'NUMBER ERROR:',
-                error
-            );
-
-
+            console.error('NUMBER ERROR:', error);
             try {
-
                 await bot.sendMessage(
-
                     chatId,
-
                     '❌ একটি technical error হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।'
-
                 );
-
             } catch (sendError) {
-
-                console.error(
-                    'ERROR MESSAGE SEND FAILED:',
-                    sendError.message
-                );
-
+                console.error('ERROR MESSAGE SEND FAILED:', sendError.message);
             }
-
         } finally {
-
             userLocks[chatId] = false;
-
         }
 
     }
@@ -777,67 +622,45 @@ bot.on('message', async (msg) => {
 
 
 // ===============================
-// CALLBACK QUERY
+// CALLBACK QUERY (METHOD SELECTION)
 // ===============================
 
 bot.on('callback_query', async (query) => {
 
     try {
 
-        if (
-            !query.message ||
-            !query.message.chat
-        ) {
+        if (!query.message || !query.message.chat) {
             return;
         }
 
-        const chatId =
-            query.message.chat.id;
+        const chatId = query.message.chat.id;
+        const data = query.data;
 
-        const data =
-            query.data;
+        if (data && data.startsWith('withdraw_')) {
 
-        if (
-            data &&
-            data.startsWith('withdraw_')
-        ) {
+            const method = data.split('_')[1];
 
-            const method =
-                data.split('_')[1];
-
+            // প্রথমে মেথড সিলেক্ট করার পর নম্বর চাওয়ার স্টেপ সেট করা হলো
             userState[chatId] = {
-
-                step: 'AWAITING_AMOUNT',
+                step: 'AWAITING_NUMBER',
                 method: method
-
             };
 
-            await bot.answerCallbackQuery(
-                query.id
-            );
+            await bot.answerCallbackQuery(query.id);
 
             await bot.sendMessage(
-
                 chatId,
-
-                `📲 *${method}* selected হয়েছে।\n\n` +
-                `কত টাকা Withdraw করতে চান লিখে পাঠান:`,
-
+                `📲 *${method}* সিলেক্ট করা হয়েছে।\n\n` +
+                `এখন আপনার পেমেন্ট পাওয়ার জন্য *${method} নম্বরটি* লিখে পাঠান:`,
                 {
                     parse_mode: 'Markdown'
                 }
-
             );
 
         }
 
     } catch (error) {
-
-        console.error(
-            'Callback Error:',
-            error.message
-        );
-
+        console.error('Callback Error:', error.message);
     }
 
 });
@@ -847,34 +670,15 @@ bot.on('callback_query', async (query) => {
 // HTTP SERVER
 // ===============================
 
-const server =
-    http.createServer((req, res) => {
-
-        res.writeHead(
-            200,
-            {
-                'Content-Type':
-                    'text/plain; charset=utf-8'
-            }
-        );
-
-        res.end(
-            'RIFAT_SMS Bot is active and running!'
-        );
-
+const server = http.createServer((req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/plain; charset=utf-8'
     });
+    res.end('RIFAT_SMS Bot is active and running!');
+});
 
-const PORT =
-    process.env.PORT || 10000;
+const PORT = process.env.PORT || 10000;
 
-server.listen(
-    PORT,
-    '0.0.0.0',
-    () => {
-
-        console.log(
-            `Server is listening on port ${PORT}`
-        );
-
-    }
-);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is listening on port ${PORT}`);
+});
