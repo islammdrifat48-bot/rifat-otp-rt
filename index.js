@@ -486,52 +486,52 @@ bot.on('message', async (msg) => {
 
             const liveData = await getLiveAccess();
 
-            if (
-                !liveData ||
-                !liveData.data ||
-                !Array.isArray(liveData.data.services)
-            ) {
+            console.log('Live Access Response:', JSON.stringify(liveData));
+
+            if (!liveData) {
                 return bot.sendMessage(
                     chatId,
-                    '❌ Panel থেকে কোনো valid data পাওয়া যায়নি।'
+                    '❌ Panel থেকে কোনো response পাওয়া যায়নি।'
                 );
             }
 
             let targetRange = null;
 
-            for (const service of liveData.data.services) {
-                if (service.ranges && service.ranges.length > 0) {
-                    const cleaned = String(service.ranges[0]).replace(/[^0-9]/g, '');
-                    if (cleaned) {
-                        targetRange = cleaned;
-                        break;
-                    }
+            if (Array.isArray(liveData)) {
+                targetRange = liveData[0];
+            } else if (liveData.data) {
+                if (Array.isArray(liveData.data)) {
+                    targetRange = liveData.data[0];
+                } else if (typeof liveData.data === 'object') {
+                    targetRange = liveData.data.rid || liveData.data.range || liveData.data.id;
                 }
-            }
-
-            if (!targetRange) {
-                return bot.sendMessage(
-                    chatId,
-                    'ℹ️ বর্তমানে কোনো active range পাওয়া যায়নি।'
-                );
+            } else if (liveData.rid || liveData.range) {
+                targetRange = liveData.rid || liveData.range;
             }
 
             const numResult = await getNewNumber(targetRange);
 
-            if (!numResult || !numResult.data) {
+            if (!numResult) {
                 return bot.sendMessage(
                     chatId,
-                    '❌ Number allocate করতে ব্যর্থ হয়েছে।'
+                    '❌ সার্ভার থেকে নতুন নম্বর allocate করতে ব্যর্থ হয়েছে।'
                 );
             }
 
-            const phoneData = numResult.data;
-            const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
-            const countryName = phoneData.country || 'Unknown';
+            const phoneData = numResult.data || numResult;
+            const phoneNumber = phoneData.full_number || phoneData.number || phoneData.phone || 'N/A';
+            const countryName = phoneData.country || phoneData.operator || 'Unknown';
+
+            if (phoneNumber === 'N/A') {
+                return bot.sendMessage(
+                    chatId,
+                    'ℹ️ বর্তমানে প্যানেলে কোনো নাম্বার খালি নেই বা স্টক শেষ।'
+                );
+            }
 
             await bot.sendMessage(
                 chatId,
-                `📍 *দেশ:* ${countryName}\n` +
+                `📍 *দেশ/অপারেটর:* ${countryName}\n` +
                 `📞 *নম্বর:* \`${phoneNumber}\`\n\n` +
                 `✅ Active Number successfully allocated হয়েছে।`,
                 { parse_mode: 'Markdown' }
@@ -607,7 +607,6 @@ bot.on('callback_query', async (query) => {
             const userData = getUserData(chatId);
             const currentBalance = userData.totalEarned - userData.totalWithdrawn;
 
-            // কনফার্ম করার সময় ব্যালেন্স কম বা ভুল থাকলে ফেইল দেখাবে
             if (amount > currentBalance) {
                 delete userState[chatId];
                 await bot.answerCallbackQuery(query.id);
@@ -621,7 +620,6 @@ bot.on('callback_query', async (query) => {
                 );
             }
 
-            // ব্যালেন্স পর্যাপ্ত থাকলে সফল হবে এবং ব্যালেন্স কেটে নেওয়া হবে
             userData.totalWithdrawn += amount;
             delete userState[chatId];
 
@@ -629,7 +627,6 @@ bot.on('callback_query', async (query) => {
 
             await bot.answerCallbackQuery(query.id, { text: 'Withdraw Successful!' });
 
-            // ইউজারের কাছে সাকসেস মেসেজ
             await bot.sendMessage(
                 chatId,
                 `✅ *Withdraw Request সফলভাবে জমা হয়েছে!*\n\n` +
@@ -640,7 +637,6 @@ bot.on('callback_query', async (query) => {
                 { parse_mode: 'Markdown' }
             );
 
-            // এডমিনের কাছে রিকোয়েস্ট মেসেজ
             await bot.sendMessage(
                 config.ADMIN_CHAT_ID,
                 `📥 *নতুন Withdraw Request (Success)*\n\n` +
