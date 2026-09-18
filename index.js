@@ -5,7 +5,7 @@ const config = require('./config');
 const {
     getLiveAccess,
     getNewNumber,
-    getConsoleData
+    getSuccessOtp
 } = require('./api');
 
 // Bot initialization with explicit polling options and webhook disable
@@ -225,7 +225,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE FAST OTP CHECKER (CONSOLE LIVE FEED 100% FIXED)
+// SECURE SUCCESS OTP CHECKER (UID EXCLUSIVE)
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
@@ -244,11 +244,11 @@ async function startFastOtpChecker(chatId, phoneNumber) {
         }
 
         try {
-            // কনসোল থেকে গ্লোবাল লাইভ ফিড নিয়ে আসা হচ্ছে
-            const consoleResult = await getConsoleData();
-            if (consoleResult && consoleResult.data) {
-                const hitsList = consoleResult.data.hits || consoleResult.data.otps || consoleResult.data;
-                const items = Array.isArray(hitsList) ? hitsList : Object.values(hitsList);
+            // শুধুমাত্র ইউজারের নিজের একাউন্টের সাকসেসফুল ওটিপি ফিড নিয়ে আসা হচ্ছে
+            const otpResult = await getSuccessOtp();
+            if (otpResult && otpResult.data) {
+                const otpsList = otpResult.data.otps || otpResult.data.hits || otpResult.data;
+                const items = Array.isArray(otpsList) ? otpsList : Object.values(otpsList);
 
                 for (let item of items) {
                     if (!item) continue;
@@ -259,7 +259,7 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                     const cleanTargetNum = targetNum ? String(targetNum).replace(/\D/g, '') : '';
                     const uniqueOtpId = `${cleanTargetNum}_${item.otp_id || messageText}_${item.time || Date.now()}`;
 
-                    // নাম্বার বা রেঞ্জের সাথে ইউজারের নাম্বার পুরোপুরি মিলিয়ে দেখা হচ্ছে
+                    // নাম্বার নিখুঁতভাবে মিলে গেলে এবং মেসেজ থাকলে তবেই গ্রহণ করবে
                     if (cleanTargetNum && (cleanTargetNum.includes(cleanUserPhone) || cleanUserPhone.includes(cleanTargetNum)) && messageText) {
                         
                         if (processedOtps.has(uniqueOtpId)) {
@@ -304,7 +304,7 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                 }
             }
         } catch (err) {
-            console.error('Fast OTP Check error:', err.message);
+            console.error('Success OTP Check error:', err.message);
         }
     }, intervalTime);
 }
