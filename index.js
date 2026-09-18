@@ -1,9 +1,28 @@
+const http = require('http');
 const TelegramBot = require('node-telegram-bot-api');
 const { Pool } = require('pg');
 const config = require('./config');
 
 // ==================================================
-// VALIDATE CONFIG
+// RENDER WEB SERVICE PORT
+// ==================================================
+
+const PORT = process.env.PORT || 10000;
+
+const server = http.createServer((req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/plain; charset=utf-8'
+    });
+
+    res.end('RIFAT SMS Bot is running.');
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 Web server listening on port ${PORT}`);
+});
+
+// ==================================================
+// CONFIG CHECK
 // ==================================================
 
 if (!config.BOT_TOKEN) {
@@ -40,7 +59,7 @@ const bot = new TelegramBot(config.BOT_TOKEN, {
 });
 
 // ==================================================
-// BOT ERROR HANDLING
+// ERROR HANDLING
 // ==================================================
 
 bot.on('polling_error', (error) => {
@@ -80,7 +99,7 @@ async function initDatabase() {
 }
 
 // ==================================================
-// USER DATA
+// GET USER DATA
 // ==================================================
 
 async function getUserData(userId) {
@@ -111,7 +130,7 @@ async function getUserData(userId) {
 }
 
 // ==================================================
-// BALANCE
+// GET BALANCE
 // ==================================================
 
 async function getBalance(userId) {
@@ -146,7 +165,7 @@ const mainMenu = {
 const userState = {};
 
 // ==================================================
-// /START
+// START COMMAND
 // ==================================================
 
 bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
@@ -183,7 +202,7 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
 });
 
 // ==================================================
-// BALANCE MESSAGE
+// BALANCE
 // ==================================================
 
 async function sendBalance(chatId) {
@@ -192,8 +211,11 @@ async function sendBalance(chatId) {
 
         const data = await getUserData(chatId);
 
-        const totalEarned = Number(data.total_earned);
-        const totalWithdrawn = Number(data.total_withdrawn);
+        const totalEarned =
+            Number(data.total_earned);
+
+        const totalWithdrawn =
+            Number(data.total_withdrawn);
 
         const balance =
             totalEarned - totalWithdrawn;
@@ -241,7 +263,6 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // Ignore commands handled elsewhere
     if (
         text.startsWith('/start') ||
         text.startsWith('/stat')
@@ -249,9 +270,9 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // ------------------------------------------------
+    // ==================================================
     // BALANCE
-    // ------------------------------------------------
+    // ==================================================
 
     if (
         text === '💰 Balance' ||
@@ -262,18 +283,18 @@ bot.on('message', async (msg) => {
         return sendBalance(chatId);
     }
 
-    // ------------------------------------------------
+    // ==================================================
     // SUPPORT
-    // ------------------------------------------------
+    // ==================================================
 
     if (
         text === '💬 Support' ||
         text.toLowerCase() === 'support'
     ) {
 
-        const username = String(
-            config.SUPPORT_USERNAME || ''
-        ).replace('@', '');
+        const username =
+            String(config.SUPPORT_USERNAME || '')
+                .replace('@', '');
 
         if (!username) {
 
@@ -306,9 +327,9 @@ bot.on('message', async (msg) => {
         );
     }
 
-    // ------------------------------------------------
+    // ==================================================
     // WITHDRAW
-    // ------------------------------------------------
+    // ==================================================
 
     if (
         text === '💸 Withdraw' ||
@@ -341,27 +362,22 @@ bot.on('message', async (msg) => {
 
             return bot.sendMessage(
                 chatId,
-
                 '💳 Select your withdrawal method:',
-
                 {
                     reply_markup: {
                         inline_keyboard: [
-
                             [
                                 {
                                     text: '🌸 Bkash',
                                     callback_data:
                                         'withdraw_Bkash'
                                 },
-
                                 {
                                     text: '🟠 Nagad',
                                     callback_data:
                                         'withdraw_Nagad'
                                 }
                             ],
-
                             [
                                 {
                                     text: '🚀 Rocket',
@@ -388,9 +404,9 @@ bot.on('message', async (msg) => {
         }
     }
 
-    // ------------------------------------------------
+    // ==================================================
     // WALLET NUMBER
-    // ------------------------------------------------
+    // ==================================================
 
     if (
         userState[chatId] &&
@@ -420,9 +436,9 @@ bot.on('message', async (msg) => {
         );
     }
 
-    // ------------------------------------------------
+    // ==================================================
     // AMOUNT
-    // ------------------------------------------------
+    // ==================================================
 
     if (
         userState[chatId] &&
@@ -471,400 +487,4 @@ bot.on('message', async (msg) => {
 
             `⚠️ *Confirm Withdrawal*\n\n` +
             `🔹 Method: ${state.method}\n` +
-            `📞 Number: \`${state.walletNumber}\`\n` +
-            `💰 Amount: \`${amount.toFixed(2)}\` ৳`,
-
-            {
-                parse_mode: 'Markdown',
-
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            {
-                                text: '✅ Confirm',
-                                callback_data:
-                                    'confirm_withdraw'
-                            },
-
-                            {
-                                text: '❌ Cancel',
-                                callback_data:
-                                    'cancel_withdraw'
-                            }
-                        ]
-                    ]
-                }
-            }
-        );
-    }
-});
-
-// ==================================================
-// CALLBACK QUERY
-// ==================================================
-
-bot.on('callback_query', async (query) => {
-
-    const chatId =
-        query.message?.chat?.id;
-
-    if (!chatId) {
-        return;
-    }
-
-    try {
-
-        const data = query.data;
-
-        // ------------------------------------------------
-        // WITHDRAW METHOD
-        // ------------------------------------------------
-
-        if (
-            data &&
-            data.startsWith('withdraw_')
-        ) {
-
-            const method =
-                data.split('_')[1];
-
-            userState[chatId] = {
-                step: 'NUMBER',
-                method
-            };
-
-            await bot.answerCallbackQuery(
-                query.id
-            );
-
-            return bot.sendMessage(
-                chatId,
-
-                `📲 *${method} selected.*\n\n` +
-                `Send your wallet number:`,
-
-                {
-                    parse_mode: 'Markdown'
-                }
-            );
-        }
-
-        // ------------------------------------------------
-        // CANCEL
-        // ------------------------------------------------
-
-        if (data === 'cancel_withdraw') {
-
-            delete userState[chatId];
-
-            await bot.answerCallbackQuery(
-                query.id,
-                {
-                    text: 'Cancelled'
-                }
-            );
-
-            return bot.sendMessage(
-                chatId,
-                '❌ Withdrawal cancelled.'
-            );
-        }
-
-        // ------------------------------------------------
-        // CONFIRM WITHDRAW
-        // ------------------------------------------------
-
-        if (data === 'confirm_withdraw') {
-
-            const state =
-                userState[chatId];
-
-            if (
-                !state ||
-                state.step !== 'CONFIRM'
-            ) {
-
-                return bot.answerCallbackQuery(
-                    query.id,
-                    {
-                        text: 'Session expired.'
-                    }
-                );
-            }
-
-            const client =
-                await pool.connect();
-
-            try {
-
-                await client.query('BEGIN');
-
-                const result =
-                    await client.query(
-                        `
-                        SELECT
-                            total_earned,
-                            total_withdrawn
-                        FROM users
-                        WHERE user_id = $1
-                        FOR UPDATE
-                        `,
-                        [chatId]
-                    );
-
-                if (!result.rows.length) {
-
-                    throw new Error(
-                        'User not found'
-                    );
-                }
-
-                const earned =
-                    Number(
-                        result.rows[0].total_earned
-                    );
-
-                const withdrawn =
-                    Number(
-                        result.rows[0].total_withdrawn
-                    );
-
-                const balance =
-                    earned - withdrawn;
-
-                if (state.amount > balance) {
-
-                    await client.query(
-                        'ROLLBACK'
-                    );
-
-                    delete userState[chatId];
-
-                    await bot.answerCallbackQuery(
-                        query.id,
-                        {
-                            text:
-                                'Insufficient balance'
-                        }
-                    );
-
-                    return bot.sendMessage(
-                        chatId,
-
-                        `❌ Insufficient balance.\n\n` +
-                        `💳 Current Balance: ` +
-                        `${balance.toFixed(2)} ৳`
-                    );
-                }
-
-                await client.query(
-                    `
-                    UPDATE users
-                    SET
-                        total_withdrawn =
-                            total_withdrawn + $1,
-                        updated_at =
-                            CURRENT_TIMESTAMP
-                    WHERE user_id = $2
-                    `,
-                    [
-                        state.amount,
-                        chatId
-                    ]
-                );
-
-                await client.query(
-                    'COMMIT'
-                );
-
-            } catch (error) {
-
-                try {
-                    await client.query(
-                        'ROLLBACK'
-                    );
-                } catch (_) {}
-
-                throw error;
-
-            } finally {
-
-                client.release();
-            }
-
-            const username =
-                query.from?.username
-                    ? '@' + query.from.username
-                    : 'N/A';
-
-            await bot.answerCallbackQuery(
-                query.id,
-                {
-                    text:
-                        'Withdrawal submitted'
-                }
-            );
-
-            // ------------------------------------------------
-            // USER MESSAGE
-            // ------------------------------------------------
-
-            await bot.sendMessage(
-                chatId,
-
-                `✅ *Withdrawal Request Submitted*\n\n` +
-                `🔹 Method: ${state.method}\n` +
-                `📞 Number: \`${state.walletNumber}\`\n` +
-                `💰 Amount: \`${state.amount.toFixed(2)}\` ৳\n\n` +
-                `⏳ Please wait for Admin verification.`,
-
-                {
-                    parse_mode: 'Markdown'
-                }
-            );
-
-            // ------------------------------------------------
-            // ADMIN MESSAGE
-            // ------------------------------------------------
-
-            if (config.ADMIN_CHAT_ID) {
-
-                await bot.sendMessage(
-                    config.ADMIN_CHAT_ID,
-
-                    `📥 *New Withdrawal Request*\n\n` +
-                    `👤 User: ${username}\n` +
-                    `🆔 ID: \`${chatId}\`\n` +
-                    `💳 Method: ${state.method}\n` +
-                    `📞 Number: \`${state.walletNumber}\`\n` +
-                    `💰 Amount: \`${state.amount.toFixed(2)}\` ৳`,
-
-                    {
-                        parse_mode: 'Markdown'
-                    }
-                );
-            }
-
-            delete userState[chatId];
-        }
-
-    } catch (error) {
-
-        console.error(
-            '❌ Callback Error:',
-            error.message
-        );
-    }
-});
-
-// ==================================================
-// START BOT
-// ==================================================
-
-async function startBot() {
-
-    try {
-
-        console.log('🚀 Starting bot...');
-
-        // Test PostgreSQL
-        await pool.query('SELECT 1');
-
-        console.log(
-            '✅ PostgreSQL connection OK.'
-        );
-
-        // Create table
-        await initDatabase();
-
-        // Remove webhook
-        await bot.deleteWebHook();
-
-        console.log(
-            '✅ Telegram webhook cleared.'
-        );
-
-        // Start polling
-        await bot.startPolling({
-            interval: 500,
-            params: {
-                timeout: 10
-            }
-        });
-
-        const me =
-            await bot.getMe();
-
-        console.log(
-            '================================='
-        );
-
-        console.log(
-            '✅ BOT CONNECTED'
-        );
-
-        console.log(
-            'Username:',
-            '@' + me.username
-        );
-
-        console.log(
-            'Bot ID:',
-            me.id
-        );
-
-        console.log(
-            '================================='
-        );
-
-    } catch (error) {
-
-        console.error(
-            '❌ STARTUP FAILED:',
-            error.message
-        );
-
-        process.exit(1);
-    }
-}
-
-// ==================================================
-// GRACEFUL SHUTDOWN
-// ==================================================
-
-async function shutdown(signal) {
-
-    console.log(
-        `\n🛑 ${signal} received.`
-    );
-
-    try {
-
-        await bot.stopPolling();
-
-    } catch (_) {}
-
-    try {
-
-        await pool.end();
-
-    } catch (_) {}
-
-    process.exit(0);
-}
-
-process.once(
-    'SIGINT',
-    () => shutdown('SIGINT')
-);
-
-process.once(
-    'SIGTERM',
-    () => shutdown('SIGTERM')
-);
-
-// ==================================================
-// RUN
-// ==================================================
-
-startBot();
+            `📞 Number: \`${state.walletNumber}\`\
