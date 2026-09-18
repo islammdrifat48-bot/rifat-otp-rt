@@ -1,10 +1,10 @@
 module.exports = {
-    BOT_TOKEN: '8635928632:AAGFTwJf8HTnV1EtLSdi64OfADa3x-sWfLI',
-    VOLTX_API_KEY: 'MA8O4Z4K4VX',
+    BOT_TOKEN: process.env.BOT_TOKEN,
+    VOLTX_API_KEY: process.env.VOLTX_API_KEY,
 
     REQUIRED_CHANNEL: '@otpgroup_rt',
     SUPPORT_USERNAME: 'RIFAT_OTP_EARNING',
-    ADMIN_CHAT_ID: '6315111273',
+    ADMIN_CHAT_ID: process.env.ADMIN_CHAT_ID,
 
     BASE_URL: 'https://api.2oo9.cloud/MXS47FLFX0U/tnevs/@public/api',
 
