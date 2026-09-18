@@ -8,5 +8,4 @@ module.exports = {
 
     BASE_URL: 'https://api.2oo9.cloud/MXS47FLFX0U/tnevs/@public/api',
 
-    DATABASE_URL: process.env.DATABASE_URL
 };
