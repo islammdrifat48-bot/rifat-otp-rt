@@ -5,7 +5,7 @@ const config = require('./config');
 const {
     getLiveAccess,
     getNewNumber,
-    getSuccessOtp
+    getConsoleData
 } = require('./api');
 
 // Bot initialization with explicit polling options and webhook disable
@@ -225,7 +225,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE FAST OTP CHECKER (100% FIXED & CLEANED)
+// SECURE FAST OTP CHECKER (CONSOLE LIVE FEED 100% FIXED)
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
@@ -244,22 +244,23 @@ async function startFastOtpChecker(chatId, phoneNumber) {
         }
 
         try {
-            const otpResult = await getSuccessOtp();
-            if (otpResult && otpResult.data) {
-                const otpsList = otpResult.data.otps || otpResult.data;
-                const items = Array.isArray(otpsList) ? otpsList : Object.values(otpsList);
+            // কনসোল থেকে গ্লোবাল লাইভ ফিড নিয়ে আসা হচ্ছে
+            const consoleResult = await getConsoleData();
+            if (consoleResult && consoleResult.data) {
+                const hitsList = consoleResult.data.hits || consoleResult.data.otps || consoleResult.data;
+                const items = Array.isArray(hitsList) ? hitsList : Object.values(hitsList);
 
                 for (let item of items) {
                     if (!item) continue;
 
-                    const targetNum = item.number || item.phone || item.full_number;
+                    const targetNum = item.number || item.phone || item.full_number || item.range || '';
                     const messageText = item.message || item.sms || item.code || '';
 
                     const cleanTargetNum = targetNum ? String(targetNum).replace(/\D/g, '') : '';
-                    const uniqueOtpId = `${cleanTargetNum}_${item.otp_id || messageText}`;
+                    const uniqueOtpId = `${cleanTargetNum}_${item.otp_id || messageText}_${item.time || Date.now()}`;
 
-                    // উভয় পাশের নাম্বার ডিজিটে কনভার্ট করে ম্যাচ করা হচ্ছে যাতে প্লাস(+) বা স্পেসের সমস্যা না হয়
-                    if (cleanTargetNum && cleanTargetNum.includes(cleanUserPhone) && messageText) {
+                    // নাম্বার বা রেঞ্জের সাথে ইউজারের নাম্বার পুরোপুরি মিলিয়ে দেখা হচ্ছে
+                    if (cleanTargetNum && (cleanTargetNum.includes(cleanUserPhone) || cleanUserPhone.includes(cleanTargetNum)) && messageText) {
                         
                         if (processedOtps.has(uniqueOtpId)) {
                             continue;
