@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
+const { Pool } = require('pg');
 
 const config = require('./config');
 const {
@@ -7,6 +8,67 @@ const {
     getNewNumber,
     getSuccessOtp
 } = require('./api');
+
+// ===============================
+// DATABASE CONNECTION (PostgreSQL)
+// ===============================
+
+const pool = new Pool({
+    connectionString: config.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
+
+async function initDatabase() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                chat_id BIGINT PRIMARY KEY,
+                total_otp INT DEFAULT 0,
+                total_earned NUMERIC(10, 2) DEFAULT 0.00,
+                total_withdrawn NUMERIC(10, 2) DEFAULT 0.00
+            );
+        `);
+        console.log('Database connected and tables verified successfully.');
+    } catch (err) {
+        console.error('Database initialization error:', err.message);
+    }
+}
+
+initDatabase();
+
+async function getUserData(chatId) {
+    try {
+        let res = await pool.query('SELECT * FROM users WHERE chat_id = $1', [chatId]);
+        if (res.rows.length === 0) {
+            await pool.query(
+                'INSERT INTO users (chat_id, total_otp, total_earned, total_withdrawn) VALUES ($1, 0, 0.00, 0.00)',
+                [chatId]
+            );
+            return { total_otp: 0, total_earned: 0.00, total_withdrawn: 0.00 };
+        }
+        return res.rows[0];
+    } catch (err) {
+        console.error('Get user data error:', err.message);
+        return { total_otp: 0, total_earned: 0.00, total_withdrawn: 0.00 };
+    }
+}
+
+async function updateUserData(chatId, otpInc, earnedInc, withdrawnInc) {
+    try {
+        await pool.query(`
+            UPDATE users 
+            SET total_otp = total_otp + $2, 
+                total_earned = total_earned + $3, 
+                total_withdrawn = total_withdrawn + $4 
+            WHERE chat_id = $1
+        `, [chatId, otpInc, earnedInc, withdrawnInc]);
+    } catch (err) {
+        console.error('Update user data error:', err.message);
+    }
+}
+
 
 const bot = new TelegramBot(config.BOT_TOKEN, {
     polling: {
@@ -58,24 +120,10 @@ bot.getMe()
 
 const userLocks = {};
 const userState = {};
-const userBalance = {};
 const processedOtps = new Set();
 
 const MIN_WITHDRAW_AMOUNT = 100.00;
 const OTP_REWARD_AMOUNT = 0.70;
-
-
-function getUserData(userId) {
-    if (!userBalance[userId]) {
-        userBalance[userId] = {
-            totalOtp: 0,
-            totalEarned: 0,
-            totalWithdrawn: 0
-        };
-    }
-
-    return userBalance[userId];
-}
 
 
 // ===============================
@@ -139,7 +187,7 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
 
     delete userState[chatId];
 
-    getUserData(chatId);
+    await getUserData(chatId);
 
     try {
 
@@ -188,17 +236,19 @@ async function sendBalance(chatId) {
 
     delete userState[chatId];
 
-    const data = getUserData(chatId);
+    const data = await getUserData(chatId);
 
-    const currentBalance =
-        data.totalEarned -
-        data.totalWithdrawn;
+    const earned = Number(data.total_earned) || 0;
+    const withdrawn = Number(data.total_withdrawn) || 0;
+    const totalOtp = Number(data.total_otp) || 0;
+
+    const currentBalance = earned - withdrawn;
 
     const balanceMsg =
         `📊 *Your Account Statement:*\n\n` +
-        `🔢 *Total Received OTP:* \`${data.totalOtp}\`\n` +
-        `💵 *Total Earnings:* \`${data.totalEarned.toFixed(2)}\` ৳\n` +
-        `🏧 *Total Withdrawal:* \`${data.totalWithdrawn.toFixed(2)}\` ৳\n` +
+        `🔢 *Total Received OTP:* \`${totalOtp}\`\n` +
+        `💵 *Total Earnings:* \`${earned.toFixed(2)}\` ৳\n` +
+        `🏧 *Total Withdrawal:* \`${withdrawn.toFixed(2)}\` ৳\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
         `💳 *Current Balance:* \`${currentBalance.toFixed(2)}\` ৳\n\n` +
         `📌 *Minimum Withdraw: 100 ৳*`;
@@ -264,9 +314,7 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                             processedOtps.add(uniqueOtpId);
                             clearInterval(interval);
 
-                            const userData = getUserData(chatId);
-                            userData.totalOtp += 1;
-                            userData.totalEarned += OTP_REWARD_AMOUNT;
+                            await updateUserData(chatId, 1, OTP_REWARD_AMOUNT, 0);
 
                             const otpMsg =
                                 `🎉 *OTP Received Successfully!*\n\n` +
@@ -395,8 +443,8 @@ bot.on('message', async (msg) => {
 
         delete userState[chatId];
 
-        const data = getUserData(chatId);
-        const currentBalance = data.totalEarned - data.totalWithdrawn;
+        const data = await getUserData(chatId);
+        const currentBalance = (Number(data.total_earned) || 0) - (Number(data.total_withdrawn) || 0);
 
         const withdrawMethods = {
 
@@ -686,8 +734,8 @@ bot.on('callback_query', async (query) => {
             }
 
             const { method, walletNumber, amount } = userState[chatId];
-            const userData = getUserData(chatId);
-            const currentBalance = userData.totalEarned - userData.totalWithdrawn;
+            const dbData = await getUserData(chatId);
+            const currentBalance = (Number(dbData.total_earned) || 0) - (Number(dbData.total_withdrawn) || 0);
 
             if (amount > currentBalance) {
                 delete userState[chatId];
@@ -702,7 +750,7 @@ bot.on('callback_query', async (query) => {
                 );
             }
 
-            userData.totalWithdrawn += amount;
+            await updateUserData(chatId, 0, 0, amount);
             delete userState[chatId];
 
             const username = user.username ? '@' + user.username : 'N/A';
