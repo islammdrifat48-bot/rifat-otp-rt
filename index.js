@@ -225,7 +225,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE FAST OTP CHECKER
+// SECURE FAST OTP CHECKER (UPDATED)
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
@@ -243,56 +243,59 @@ async function startFastOtpChecker(chatId, phoneNumber) {
 
         try {
             const otpResult = await getSuccessOtp();
-            if (otpResult) {
-                const items = otpResult.data || otpResult.items || otpResult;
-                if (Array.isArray(items)) {
-                    for (let item of items) {
-                        const targetNum = item.number || item.phone || item.full_number;
-                        const code = item.otp || item.code || item.sms;
+            if (otpResult && otpResult.data) {
+                // API ডেমো অনুযায়ী otps হলো আসল লিস্ট[span_1](start_span)[span_1](end_span)
+                const otpsList = otpResult.data.otps || otpResult.data;
+                const items = Array.isArray(otpsList) ? otpsList : Object.values(otpsList);
 
-                        const uniqueOtpId = `${targetNum}_${code}`;
+                for (let item of items) {
+                    if (!item) continue;
 
-                        if (targetNum && String(targetNum).includes(phoneNumber) && code) {
-                            
-                            if (processedOtps.has(uniqueOtpId)) {
-                                continue;
-                            }
+                    const targetNum = item.number || item.phone || item.full_number;
+                    const messageText = item.message || item.sms || item.code || '';
 
-                            if ((Date.now() - startTime) > maxDurationMs) {
-                                clearInterval(interval);
-                                return;
-                            }
+                    const uniqueOtpId = `${targetNum}_${item.otp_id || messageText}`;
 
-                            processedOtps.add(uniqueOtpId);
+                    if (targetNum && String(targetNum).includes(phoneNumber) && messageText) {
+                        
+                        if (processedOtps.has(uniqueOtpId)) {
+                            continue;
+                        }
+
+                        if ((Date.now() - startTime) > maxDurationMs) {
                             clearInterval(interval);
-
-                            const userData = getUserData(chatId);
-                            userData.totalOtp += 1;
-                            userData.totalEarned += OTP_REWARD_AMOUNT;
-
-                            const otpMsg =
-                                `🎉 *OTP Received Successfully!*\n\n` +
-                                `📞 *Number:* \`${phoneNumber}\`\n` +
-                                `💬 *OTP Code:* \`${code}\`\n` +
-                                `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
-                                `✅ OTP successfully received!`;
-
-                            const otpKeyboard = {
-                                reply_markup: {
-                                    inline_keyboard: [
-                                        [
-                                            { text: 'OTP Group', url: 'https://t.me/otpgroup_rt' }
-                                        ]
-                                    ]
-                                }
-                            };
-
-                            await bot.sendMessage(chatId, otpMsg, {
-                                parse_mode: 'Markdown',
-                                ...otpKeyboard
-                            });
                             return;
                         }
+
+                        processedOtps.add(uniqueOtpId);
+                        clearInterval(interval);
+
+                        const userData = getUserData(chatId);
+                        userData.totalOtp += 1;
+                        userData.totalEarned += OTP_REWARD_AMOUNT;
+
+                        const otpMsg =
+                            `🎉 *OTP Received Successfully!*\n\n` +
+                            `📞 *Number:* \`${phoneNumber}\`\n` +
+                            `💬 *Details:* \`${messageText}\`\n` +
+                            `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
+                            `✅ OTP successfully received!`;
+
+                        const otpKeyboard = {
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [
+                                        { text: 'OTP Group', url: 'https://t.me/otpgroup_rt' }
+                                    ]
+                                ]
+                            }
+                        };
+
+                        await bot.sendMessage(chatId, otpMsg, {
+                            parse_mode: 'Markdown',
+                            ...otpKeyboard
+                        });
+                        return;
                     }
                 }
             }
