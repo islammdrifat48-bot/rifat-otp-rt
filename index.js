@@ -225,13 +225,15 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE FAST OTP CHECKER (UPDATED)
+// SECURE FAST OTP CHECKER (100% FIXED & CLEANED)
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
     const startTime = Date.now();
     const maxDurationMs = 15 * 60 * 1000;
     const intervalTime = 1000;
+
+    const cleanUserPhone = String(phoneNumber).replace(/\D/g, '');
 
     const interval = setInterval(async () => {
         const elapsedTime = Date.now() - startTime;
@@ -244,7 +246,6 @@ async function startFastOtpChecker(chatId, phoneNumber) {
         try {
             const otpResult = await getSuccessOtp();
             if (otpResult && otpResult.data) {
-                // API ডেমো অনুযায়ী otps হলো আসল লিস্ট[span_1](start_span)[span_1](end_span)
                 const otpsList = otpResult.data.otps || otpResult.data;
                 const items = Array.isArray(otpsList) ? otpsList : Object.values(otpsList);
 
@@ -254,9 +255,11 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                     const targetNum = item.number || item.phone || item.full_number;
                     const messageText = item.message || item.sms || item.code || '';
 
-                    const uniqueOtpId = `${targetNum}_${item.otp_id || messageText}`;
+                    const cleanTargetNum = targetNum ? String(targetNum).replace(/\D/g, '') : '';
+                    const uniqueOtpId = `${cleanTargetNum}_${item.otp_id || messageText}`;
 
-                    if (targetNum && String(targetNum).includes(phoneNumber) && messageText) {
+                    // উভয় পাশের নাম্বার ডিজিটে কনভার্ট করে ম্যাচ করা হচ্ছে যাতে প্লাস(+) বা স্পেসের সমস্যা না হয়
+                    if (cleanTargetNum && cleanTargetNum.includes(cleanUserPhone) && messageText) {
                         
                         if (processedOtps.has(uniqueOtpId)) {
                             continue;
