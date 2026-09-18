@@ -1,5 +1,5 @@
 module.exports = {
-    BOT_TOKEN: '8635928632:AAGFTwJf8HTnV1EtLSdi64OfADa3x-sWfLI',
+    BOT_TOKEN: '',
     VOLTX_API_KEY: 'MA8O4Z4K4VX',
 
     REQUIRED_CHANNEL: '@otpgroup_rt',
