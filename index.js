@@ -66,6 +66,9 @@ const processedOtps = new Set();
 const MIN_WITHDRAW_AMOUNT = 100.00;
 const OTP_REWARD_AMOUNT = 0.70;
 
+// পাবলিক ইউআইডি (UID) কনফিগারেশন
+const PUBLIC_UID = 'MQUPBWI9AQJ';
+
 // মেথড গ্রুপের ইউজারনেম (বট চালানোর সময় এই গ্রুপে জয়েন করা বাধ্যতামূলক)
 const METHOD_CHANNEL = '@otpmethod_r';
 
@@ -220,6 +223,7 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
             chatId,
 
             `👋 *RIFAT_SMS* Bot service is active!\n\n` +
+            `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
             `💡 *Per OTP Reward:* ${OTP_REWARD_AMOUNT} ৳\n` +
             `⏱️ *Time Limit:* OTP must arrive within 15 minutes.\n\n` +
             `Click *Get Active Number* to get a number or click *Balance* to check earnings.\n\n` +
@@ -269,6 +273,7 @@ async function sendBalance(chatId) {
 
     const balanceMsg =
         `📊 *Your Account Statement:*\n\n` +
+        `🆔 *Public UID:* \`${PUBLIC_UID}\`\n` +
         `🔢 *Total Received OTP:* \`${data.totalOtp}\`\n` +
         `💵 *Total Earnings:* \`${data.totalEarned.toFixed(2)}\` ৳\n` +
         `🏧 *Total Withdrawal:* \`${data.totalWithdrawn.toFixed(2)}\` ৳\n` +
@@ -351,6 +356,7 @@ async function startFastOtpChecker(chatId, phoneNumber) {
 
                         const otpMsg =
                             `🎉 *OTP Received Successfully!*\n\n` +
+                            `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
                             `📞 *Number:* \`${maskedNumber}\`\n` +
                             `💬 *Details:* \`${messageText}\`\n` +
                             `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
@@ -495,7 +501,7 @@ async function showAppsMenu(chatId, messageId = null) {
             return bot.sendMessage(chatId, errText);
         }
 
-        const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n👇 Select your desired app/service below to check available countries & numbers:`;
+        const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n🆔 *UID:* \`${PUBLIC_UID}\`\n\n👇 Select your desired app/service below to check available countries & numbers:`;
         const reply_markup = { inline_keyboard: inlineKeyboard };
 
         if (messageId) {
@@ -511,7 +517,7 @@ async function showAppsMenu(chatId, messageId = null) {
 
 
 // ===============================
-// STEP 2: SHOW COUNTRIES FOR SELECTED APP
+// STEP 2: SHOW COUNTRIES FOR SELECTED APP (UPDATED)
 // ===============================
 async function showCountriesForApp(chatId, messageId, appName) {
     try {
@@ -539,7 +545,12 @@ async function showCountriesForApp(chatId, messageId, appName) {
             const sName = String(service.sid || service.name || service.title || service.service || service.app_name || service.service_name || service.platform || service.category || service.app || '').trim();
             
             if (sName.toLowerCase() === appName.toLowerCase()) {
-                const country = service.country || service.country_name || service.code || service.location || 'Global';
+                let country = service.country || service.country_name || service.code || service.location || service.region || service.countryCode || service.flag_name;
+                
+                if (!country || String(country).trim() === '' || String(country).toLowerCase() === 'global') {
+                    country = service.location_name || service.region_name || service.name || appName;
+                }
+
                 const flag = getCountryFlag(country);
                 
                 let rangeVal = '';
@@ -584,7 +595,9 @@ async function showCountriesForApp(chatId, messageId, appName) {
             parse_mode: 'Markdown',
             reply_markup
         });
-    } catch (error) {}
+    } catch (error) {
+        console.error('ShowCountriesForApp Error:', error);
+    }
 }
 
 
@@ -717,6 +730,7 @@ bot.on('message', async (msg) => {
             chatId,
 
             `💳 *Select Withdraw Method*\n\n` +
+            `🆔 UID: \`${PUBLIC_UID}\`\n` +
             `💰 Current Balance: \`${currentBalance.toFixed(2)}\` ৳\n` +
             `📌 Minimum Withdraw: *100 ৳*`,
 
@@ -912,7 +926,8 @@ bot.on('callback_query', async (query) => {
                 config.ADMIN_CHAT_ID,
                 `📥 *New Withdraw Request (Success)*\n\n` +
                 `👤 User: ${username}\n` +
-                `🆔 ID: \`${chatId}\`\n` +
+                `🆔 UID: \`${PUBLIC_UID}\`\n` +
+                `🆔 Chat ID: \`${chatId}\`\n` +
                 `💳 Method: ${method}\n` +
                 `📞 Number: \`${walletNumber}\`\n` +
                 `💰 Amount: \`${amount.toFixed(2)}\` ৳`,
@@ -971,6 +986,7 @@ bot.on('callback_query', async (query) => {
 
             return bot.editMessageText(
                 `⚡ *━━━ RIFAT OTP SERVICE ━━━* ⚡\n\n` +
+                `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
                 `🎯 *Service:* \`${appName}\`\n` +
                 `${flagEmoji} *Country:* \`${finalCountry}\`\n` +
                 `📞 *Number:* \`${phoneNumber}\`\n\n` +
