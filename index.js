@@ -56,7 +56,6 @@ bot.getMe()
 // ===============================
 // USER DATA & STATE STORAGE
 // ===============================
-const userLocks = {};
 const userState = {};
 const userBalance = {};
 const processedOtps = new Set();
@@ -198,8 +197,8 @@ async function startFastOtpChecker(chatId, phoneNumber) {
 
         try {
             const otpResult = await getSuccessOtp();
-            if (otpResult && otpResult.data) {
-                const otpsList = otpResult.data.otps || otpResult.data.hits || otpResult.data;
+            if (otpResult) {
+                const otpsList = otpResult.otps || otpResult.hits || otpResult.data || otpResult;
                 const items = Array.isArray(otpsList) ? otpsList : Object.values(otpsList);
 
                 for (let item of items) {
@@ -248,13 +247,14 @@ async function showAppsMenu(chatId, messageId = null) {
         }
 
         const liveData = await getLiveAccess();
-        if (!liveData || !liveData.data) {
+        if (!liveData) {
             const errText = '❌ No active services available from panel right now.';
             if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
             return bot.sendMessage(chatId, errText);
         }
 
-        const servicesList = liveData.data.services || liveData.data.data || liveData.data;
+        // ভল্টেক্স প্যানেলের রেসপন্স থেকে সার্ভিস লিস্ট বের করে নেওয়া
+        const servicesList = liveData.services || liveData.data || liveData;
         const items = Array.isArray(servicesList) ? servicesList : Object.values(servicesList);
 
         if (items.length === 0) {
@@ -292,14 +292,15 @@ async function showAppsMenu(chatId, messageId = null) {
         }
 
         const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n👇 Select your desired app/service below to check available countries & numbers:`;
-        const replyMarkup = { reply_markup: { inline_keyboard: inlineKeyboard } };
+        const replyMarkup = { inline_keyboard: inlineKeyboard };
 
         if (messageId) {
-            return bot.editMessageText(menuText, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', ...replyMarkup });
+            return bot.editMessageText(menuText, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup });
         } else {
-            return bot.sendMessage(chatId, menuText, { parse_mode: 'Markdown', ...replyMarkup });
+            return bot.sendMessage(chatId, menuText, { parse_mode: 'Markdown', reply_markup });
         }
     } catch (error) {
+        console.error('ShowAppsMenu Error:', error);
         await bot.sendMessage(chatId, '❌ Failed to load services.');
     }
 }
@@ -310,9 +311,9 @@ async function showAppsMenu(chatId, messageId = null) {
 async function showCountriesForApp(chatId, messageId, appName) {
     try {
         const liveData = await getLiveAccess();
-        if (!liveData || !liveData.data) return;
+        if (!liveData) return;
 
-        const servicesList = liveData.data.services || liveData.data.data || liveData.data;
+        const servicesList = liveData.services || liveData.data || liveData;
         const items = Array.isArray(servicesList) ? servicesList : Object.values(servicesList);
 
         const inlineKeyboard = [];
@@ -327,7 +328,9 @@ async function showCountriesForApp(chatId, messageId, appName) {
                 const flag = getCountryFlag(country);
                 
                 let rangeVal = '';
-                if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
+                if (service.rid) {
+                    rangeVal = String(service.rid);
+                } else if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
                     rangeVal = String(service.ranges[0]).replace(/[^0-9]/g, '');
                 } else if (service.range) {
                     rangeVal = String(service.range).replace(/[^0-9]/g, '');
@@ -474,13 +477,13 @@ bot.on('callback_query', async (query) => {
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId });
 
             const numResult = await getNewNumber(targetRange);
-            if (!numResult || !numResult.data) {
+            if (!numResult) {
                 return bot.editMessageText('❌ Failed to allocate number.', { chat_id: chatId, message_id: messageId });
             }
 
-            const phoneData = numResult.data;
-            const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
-            const finalCountry = phoneData.country || phoneData.country_name || 'Global';
+            const phoneData = numResult.data || numResult;
+            const phoneNumber = phoneData.full_number || phoneData.number || phoneData.phone || 'N/A';
+            const finalCountry = phoneData.country || phoneData.country_name || phoneData.location || 'Global';
             const flagEmoji = getCountryFlag(finalCountry);
 
             startFastOtpChecker(chatId, phoneNumber);
