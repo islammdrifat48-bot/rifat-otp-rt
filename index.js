@@ -321,7 +321,6 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                             `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
                             `✅ OTP successfully received!`;
 
-                        // ৩টি বাটন নিশ্চিত করার জন্য প্রোপার স্ট্রাকচার
                         const otpKeyboard = {
                             reply_markup: {
                                 inline_keyboard: [
@@ -336,13 +335,11 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                             }
                         };
 
-                        // ইউজারের ইনবক্সে পাঠানো
                         await bot.sendMessage(chatId, otpMsg, {
                             parse_mode: 'Markdown',
                             ...otpKeyboard
                         });
 
-                        // চ্যানেলেও পাঠানো
                         await bot.sendMessage(config.REQUIRED_CHANNEL, `📢 *New Channel OTP Alert*\n\n` + otpMsg, {
                             parse_mode: 'Markdown',
                             ...otpKeyboard
@@ -405,7 +402,7 @@ async function showAppsMenu(chatId, messageId = null) {
         const appsSet = new Set();
         items.forEach(service => {
             if (!service) return;
-            const sName = service.name || service.title || service.service || service.app_name || service.service_name || service.platform || service.category || service.app;
+            const sName = service.sid || service.name || service.title || service.service || service.app_name || service.service_name || service.platform || service.category || service.app;
             if (sName) {
                 appsSet.add(String(sName).trim());
             }
@@ -477,7 +474,7 @@ async function showCountriesForApp(chatId, messageId, appName) {
 
         items.forEach(service => {
             if (!service) return;
-            const sName = String(service.name || service.title || service.service || service.app_name || service.service_name || service.platform || service.category || service.app || '').trim();
+            const sName = String(service.sid || service.name || service.title || service.service || service.app_name || service.service_name || service.platform || service.category || service.app || '').trim();
             
             if (sName.toLowerCase() === appName.toLowerCase()) {
                 const country = service.country || service.country_name || service.code || service.location || 'Global';
