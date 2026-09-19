@@ -207,7 +207,9 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                     const targetNum = item.number || item.phone || item.full_number || item.range || '';
                     const messageText = item.message || item.sms || item.code || '';
                     const cleanTargetNum = targetNum ? String(targetNum).replace(/\D/g, '') : '';
-                    const uniqueOtpId = `${cleanTargetNum}_${item.otp_id \vert{}\vert{} messageText}_${item.time || Date.now()}`;
+                    
+                    const safeOtpId = item.otp_id || messageText || 'otp';
+                    const uniqueOtpId = `${cleanTargetNum}_${safeOtpId}_${item.time || Date.now()}`;
 
                     if (cleanTargetNum && (cleanTargetNum.includes(cleanUserPhone) || cleanUserPhone.includes(cleanTargetNum)) && messageText) {
                         if (processedOtps.has(uniqueOtpId)) continue;
