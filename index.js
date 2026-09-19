@@ -66,9 +66,6 @@ const processedOtps = new Set();
 const MIN_WITHDRAW_AMOUNT = 100.00;
 const OTP_REWARD_AMOUNT = 0.70;
 
-// পাবলিক ইউআইডি (UID) কনফিগারেশন
-const PUBLIC_UID = 'MQUPBWI9AQJ';
-
 // মেথড গ্রুপের ইউজারনেম
 const METHOD_CHANNEL = '@otpmethod_r';
 
@@ -97,7 +94,7 @@ function maskPhoneNumber(num) {
 
 
 // ===============================
-// COUNTRY FLAG GENERATOR
+// COUNTRY FLAG GENERATOR (195+ COUNTRIES)
 // ===============================
 function getCountryFlag(countryInput) {
     if (!countryInput) return '🌐';
@@ -105,27 +102,45 @@ function getCountryFlag(countryInput) {
 
     const customMap = {
         'AFGHANISTAN': 'AF', 'ALBANIA': 'AL', 'ALGERIA': 'DZ', 'ANDORRA': 'AD', 'ANGOLA': 'AO',
-        'ARGENTINA': 'AR', 'ARMENIA': 'AM', 'AUSTRALIA': 'AU', 'AUSTRIA': 'AT', 'AZERBAIJAN': 'AZ',
-        'BAHAMAS': 'BS', 'BAHRAIN': 'BH', 'BANGLADESH': 'BD', 'BARBADOS': 'BB', 'BELARUS': 'BY',
-        'BELGIUM': 'BE', 'BELIZE': 'BZ', 'BENIN': 'BJ', 'BHUTAN': 'BT', 'BOLIVIA': 'BO',
-        'BOSNIA AND HERZEGOVINA': 'BA', 'BOTSWANA': 'BW', 'BRAZIL': 'BR', 'BRUNEI': 'BN', 'BULGARIA': 'BG',
-        'CAMBODIA': 'KH', 'CAMEROON': 'CM', 'CANADA': 'CA', 'CHILE': 'CL', 'CHINA': 'CN',
-        'COLOMBIA': 'CO', 'CROATIA': 'HR', 'CYPRUS': 'CY', 'CZECH REPUBLIC': 'CZ', 'DENMARK': 'DK',
-        'EGYPT': 'EG', 'ESTONIA': 'EE', 'ETHIOPIA': 'ET', 'FINLAND': 'FI', 'FRANCE': 'FR',
-        'GEORGIA': 'GE', 'GERMANY': 'DE', 'GHANA': 'GH', 'GREECE': 'GR', 'HUNGARY': 'HU',
-        'INDIA': 'IN', 'INDONESIA': 'ID', 'IRAN': 'IR', 'IRAQ': 'IQ', 'IRELAND': 'IE',
-        'ISRAEL': 'IL', 'ITALY': 'IT', 'JAPAN': 'JP', 'JORDAN': 'JO', 'KAZAKHSTAN': 'KZ',
-        'KENYA': 'KE', 'KUWAIT': 'KW', 'KYRGYZSTAN': 'KG', 'LAOS': 'LA', 'LATVIA': 'LV',
-        'LEBANON': 'LB', 'LITHUANIA': 'LT', 'LUXEMBOURG': 'LU', 'MALAYSIA': 'MY', 'MALDIVES': 'MV',
-        'MEXICO': 'MX', 'MONGOLIA': 'MN', 'MOROCCO': 'MA', 'MYANMAR': 'MM', 'NEPAL': 'NP',
-        'NETHERLANDS': 'NL', 'NEW ZEALAND': 'NZ', 'NIGERIA': 'NG', 'NORWAY': 'NO', 'OMAN': 'OM',
-        'PAKISTAN': 'PK', 'PANAMA': 'PA', 'PARAGUAY': 'PY', 'PERU': 'PE', 'PHILIPPINES': 'PH',
-        'POLAND': 'PL', 'PORTUGAL': 'PT', 'QATAR': 'QA', 'ROMANIA': 'RO', 'RUSSIA': 'RU',
-        'SAUDI ARABIA': 'SA', 'SERBIA': 'RS', 'SINGAPORE': 'SG', 'SLOVAKIA': 'SK', 'SOUTH AFRICA': 'ZA',
-        'SOUTH KOREA': 'KR', 'SPAIN': 'ES', 'SRI LANKA': 'LK', 'SWEDEN': 'SE', 'SWITZERLAND': 'CH',
-        'TAIWAN': 'TW', 'THAILAND': 'TH', 'TURKEY': 'TR', 'UKRAINE': 'UA', 'UAE': 'AE',
+        'ANTIGUA AND BARBUDA': 'AG', 'ARGENTINA': 'AR', 'ARMENIA': 'AM', 'AUSTRALIA': 'AU', 'AUSTRIA': 'AT',
+        'AZERBAIJAN': 'AZ', 'BAHAMAS': 'BS', 'BAHRAIN': 'BH', 'BANGLADESH': 'BD', 'BARBADOS': 'BB',
+        'BELARUS': 'BY', 'BELGIUM': 'BE', 'BELIZE': 'BZ', 'BENIN': 'BJ', 'BHUTAN': 'BT',
+        'BOLIVIA': 'BO', 'BOSNIA AND HERZEGOVINA': 'BA', 'BOTSWANA': 'BW', 'BRAZIL': 'BR', 'BRUNEI': 'BN',
+        'BULGARIA': 'BG', 'BURKINA FASO': 'BF', 'BURUNDI': 'BI', 'CABO VERDE': 'CV', 'CAMBODIA': 'KH',
+        'CAMEROON': 'CM', 'CANADA': 'CA', 'CENTRAL AFRICAN REPUBLIC': 'CF', 'CHAD': 'TD', 'CHILE': 'CL',
+        'CHINA': 'CN', 'COLOMBIA': 'CO', 'COMOROS': 'KM', 'CONGO': 'CG', 'COSTA RICA': 'CR',
+        'CROATIA': 'HR', 'CUBA': 'CU', 'CYPRUS': 'CY', 'CZECH REPUBLIC': 'CZ', 'DENMARK': 'DK',
+        'DJIBOUTI': 'DJ', 'DOMINICA': 'DM', 'DOMINICAN REPUBLIC': 'DO', 'ECUADOR': 'EC', 'EGYPT': 'EG',
+        'EL SALVADOR': 'SV', 'EQUATORIAL GUINEA': 'GQ', 'ERITREA': 'ER', 'ESTONIA': 'EE', 'ESWATINI': 'SZ',
+        'ETHIOPIA': 'ET', 'FIJI': 'FJ', 'FINLAND': 'FI', 'FRANCE': 'FR', 'GABON': 'GA',
+        'GAMBIA': 'GM', 'GEORGIA': 'GE', 'GERMANY': 'DE', 'GHANA': 'GH', 'GREECE': 'GR',
+        'GRENADA': 'GD', 'GUATEMALA': 'GT', 'GUINEA': 'GN', 'GUINEA-BISSAU': 'GW', 'GUYANA': 'GY',
+        'HAITI': 'HT', 'HONDURAS': 'HN', 'HUNGARY': 'HU', 'ICELAND': 'IS', 'INDIA': 'IN',
+        'INDONESIA': 'ID', 'IRAN': 'IR', 'IRAQ': 'IQ', 'IRELAND': 'IE', 'ISRAEL': 'IL',
+        'ITALY': 'IT', 'JAMAICA': 'JM', 'JAPAN': 'JP', 'JORDAN': 'JO', 'KAZAKHSTAN': 'KZ',
+        'KENYA': 'KE', 'KIRIBATI': 'KI', 'KOSOVO': 'XK', 'KUWAIT': 'KW', 'KYRGYZSTAN': 'KG',
+        'LAOS': 'LA', 'LATVIA': 'LV', 'LEBANON': 'LB', 'LESOTHO': 'LS', 'LIBERIA': 'LR',
+        'LIBYA': 'LY', 'LIECHTENSTEIN': 'LI', 'LITHUANIA': 'LT', 'LUXEMBOURG': 'LU', 'MADAGASCAR': 'MG',
+        'MALAWI': 'MW', 'MALAYSIA': 'MY', 'MALDIVES': 'MV', 'MALI': 'ML', 'MALTA': 'MT',
+        'MARSHALL ISLANDS': 'MH', 'MAURITANIA': 'MR', 'MAURITIUS': 'MU', 'MEXICO': 'MX', 'MICRONESIA': 'FM',
+        'MOLDOVA': 'MD', 'MONACO': 'MC', 'MONGOLIA': 'MN', 'MONTENEGRO': 'ME', 'MOROCCO': 'MA',
+        'MOZAMBIQUE': 'MZ', 'MYANMAR': 'MM', 'NAMIBIA': 'NA', 'NAURU': 'NR', 'NEPAL': 'NP',
+        'NETHERLANDS': 'NL', 'NEW ZEALAND': 'NZ', 'NICARAGUA': 'NI', 'NIGER': 'NE', 'NIGERIA': 'NG',
+        'NORTH KOREA': 'KP', 'NORTH MACEDONIA': 'MK', 'NORWAY': 'NO', 'OMAN': 'OM', 'PAKISTAN': 'PK',
+        'PALAU': 'PW', 'PALESTINE': 'PS', 'PANAMA': 'PA', 'PAPUA NEW GUINEA': 'PG', 'PARAGUAY': 'PY',
+        'PERU': 'PE', 'PHILIPPINES': 'PH', 'POLAND': 'PL', 'PORTUGAL': 'PT', 'QATAR': 'QA',
+        'ROMANIA': 'RO', 'RUSSIA': 'RU', 'RWANDA': 'RW', 'SAINT KITTS AND NEVIS': 'KN', 'SAINT LUCIA': 'LC',
+        'SAINT VINCENT AND THE GRENADINES': 'VC', 'SAMOA': 'WS', 'SAN MARINO': 'SM', 'SAO TOME AND PRINCIPE': 'ST',
+        'SAUDI ARABIA': 'SA', 'SENEGAL': 'SN', 'SERBIA': 'RS', 'SEYCHELLES': 'SC', 'SIERRA LEONE': 'SL',
+        'SINGAPORE': 'SG', 'SLOVAKIA': 'SK', 'SLOVENIA': 'SI', 'SOLOMON ISLANDS': 'SB', 'SOMALIA': 'SO',
+        'SOUTH AFRICA': 'ZA', 'SOUTH KOREA': 'KR', 'SOUTH SUDAN': 'SS', 'SPAIN': 'ES', 'SRI LANKA': 'LK',
+        'SUDAN': 'SD', 'SURINAME': 'SR', 'SWEDEN': 'SE', 'SWITZERLAND': 'CH', 'SYRIA': 'SY',
+        'TAIWAN': 'TW', 'TAJIKISTAN': 'TJ', 'TANZANIA': 'TZ', 'THAILAND': 'TH', 'TIMOR-LESTE': 'TL',
+        'TOGO': 'TG', 'TONGA': 'TO', 'TRINIDAD AND TOBAGO': 'TT', 'TUNISIA': 'TN', 'TURKEY': 'TR',
+        'TURKMENISTAN': 'TM', 'TUVALU': 'TV', 'UGANDA': 'UG', 'UKRAINE': 'UA', 'UAE': 'AE',
         'UNITED ARAB EMIRATES': 'AE', 'UK': 'GB', 'UNITED KINGDOM': 'GB', 'USA': 'US', 'UNITED STATES': 'US',
-        'UZBEKISTAN': 'UZ', 'VIETNAM': 'VN'
+        'URUGUAY': 'UY', 'UZBEKISTAN': 'UZ', 'VANUATU': 'VU', 'VATICAN CITY': 'VA', 'VENEZUELA': 'VE',
+        'VIETNAM': 'VN', 'YEMEN': 'YE', 'ZAMBIA': 'ZM', 'ZIMBABWE': 'ZW'
     };
 
     if (customMap[str]) {
@@ -198,7 +213,6 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
         await bot.sendMessage(
             chatId,
             `👋 *RIFAT_SMS* Bot service is active!\n\n` +
-            `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
             `💡 *Per OTP Reward:* ${OTP_REWARD_AMOUNT} ৳\n` +
             `⏱️ *Time Limit:* OTP must arrive within 15 minutes.\n\n` +
             `Click *Get Active Number* to get a number or click *Balance* to check earnings.\n\n` +
@@ -225,7 +239,6 @@ async function sendBalance(chatId) {
 
     const balanceMsg =
         `📊 *Your Account Statement:*\n\n` +
-        `🆔 *Public UID:* \`${PUBLIC_UID}\`\n` +
         `🔢 *Total Received OTP:* \`${data.totalOtp}\`\n` +
         `💵 *Total Earnings:* \`${data.totalEarned.toFixed(2)}\` ৳\n` +
         `🏧 *Total Withdrawal:* \`${data.totalWithdrawn.toFixed(2)}\` ৳\n` +
@@ -245,7 +258,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE SUCCESS OTP CHECKER (API Response Structure Matched)
+// SECURE SUCCESS OTP CHECKER
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
@@ -266,7 +279,6 @@ async function startFastOtpChecker(chatId, phoneNumber) {
         try {
             const otpResult = await getSuccessOtp();
             if (otpResult && otpResult.data) {
-                // ভোল্টেক্স এপিআই স্ট্রাকচার অনুযায়ী data.otps চেক করা হচ্ছে
                 const otpsList = otpResult.data.otps || otpResult.data.data || otpResult.data;
                 const items = Array.isArray(otpsList) ? otpsList : Object.values(otpsList);
 
@@ -303,7 +315,6 @@ async function startFastOtpChecker(chatId, phoneNumber) {
 
                         const otpMsg =
                             `🎉 *OTP Received Successfully!*\n\n` +
-                            `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
                             `📞 *Number:* \`${maskedNumber}\`\n` +
                             `💬 *Details:* \`${messageText}\`\n` +
                             `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
@@ -368,7 +379,6 @@ async function showAppsMenu(chatId, messageId = null) {
             return bot.sendMessage(chatId, errText);
         }
 
-        // ভোল্টেক্স লাইভ এক্সেস রেসপন্স স্ট্রাকচার অনুযায়ী data.services পার্স করা
         const rawServices = liveData.data.services || liveData.data;
         const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
 
@@ -418,7 +428,7 @@ async function showAppsMenu(chatId, messageId = null) {
             inlineKeyboard.push(row);
         }
 
-        const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n🆔 *UID:* \`${PUBLIC_UID}\`\n\n👇 Select your desired app/service below:`;
+        const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n👇 Select your desired app/service below:`;
         const reply_markup = { inline_keyboard: inlineKeyboard };
 
         if (messageId) {
@@ -526,6 +536,129 @@ bot.on('message', async (msg) => {
         return bot.sendMessage(chatId, `🎧 *Support*\n\nFor any issues, contact Admin.`, { parse_mode: 'Markdown', ...supportKeyboard });
     }
 
+    // ===========================
+    // WITHDRAW BUTTON CLICK
+    // ===========================
+    if (text.includes('WITHDRAW') || text.includes('💸')) {
+        delete userState[chatId];
+
+        const data = getUserData(chatId);
+        const currentBalance = data.totalEarned - data.totalWithdrawn;
+
+        if (currentBalance < MIN_WITHDRAW_AMOUNT) {
+            return bot.sendMessage(
+                chatId,
+                `❌ *Insufficient Balance!*\n\n` +
+                `Your Current Balance: \`${currentBalance.toFixed(2)}\` ৳\n` +
+                `Minimum Withdraw: \`${MIN_WITHDRAW_AMOUNT}\` ৳\n\n` +
+                `Complete more OTPs to reach the minimum limit!`,
+                { parse_mode: 'Markdown', reply_markup: mainMenu.reply_markup }
+            );
+        }
+
+        const withdrawMethods = {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: '🌸 Bkash', callback_data: 'withdraw_Bkash' },
+                        { text: '🟠 Nagad', callback_data: 'withdraw_Nagad' }
+                    ],
+                    [
+                        { text: '🚀 Rocket', callback_data: 'withdraw_Rocket' }
+                    ]
+                ]
+            }
+        };
+
+        return bot.sendMessage(
+            chatId,
+            `💳 *Select Withdraw Method*\n\n` +
+            `💰 Current Balance: \`${currentBalance.toFixed(2)}\` ৳\n` +
+            `📌 Minimum Withdraw: *100 ৳*`,
+            {
+                parse_mode: 'Markdown',
+                ...withdrawMethods
+            }
+        );
+    }
+
+    // ===========================
+    // STEP 1: RECEIVE WALLET NUMBER
+    // ===========================
+    if (userState[chatId] && userState[chatId].step === 'AWAITING_NUMBER') {
+        const method = userState[chatId].method;
+        const walletNumber = text.replace(/[\s-]/g, '');
+
+        if (!/^\d{10,15}$/.test(walletNumber)) {
+            return bot.sendMessage(
+                chatId,
+                `❌ Please provide a valid ${method} number.`
+            );
+        }
+
+        userState[chatId].walletNumber = walletNumber;
+        userState[chatId].step = 'AWAITING_AMOUNT';
+
+        return bot.sendMessage(
+            chatId,
+            `📲 Number accepted: \`${walletNumber}\`\n\n` +
+            `Now send the amount of money you want to withdraw:`,
+            {
+                parse_mode: 'Markdown'
+            }
+        );
+    }
+
+    // ===========================
+    // STEP 2: RECEIVE AMOUNT & ASK CONFIRMATION
+    // ===========================
+    if (userState[chatId] && userState[chatId].step === 'AWAITING_AMOUNT') {
+        const amount = Number(text.replace(/,/g, ''));
+        const data = getUserData(chatId);
+        const currentBalance = data.totalEarned - data.totalWithdrawn;
+
+        if (!Number.isFinite(amount) || amount < MIN_WITHDRAW_AMOUNT) {
+            return bot.sendMessage(
+                chatId,
+                `❌ Minimum withdraw amount is 100 ৳. Enter the correct amount:`
+            );
+        }
+
+        if (amount > currentBalance) {
+            return bot.sendMessage(
+                chatId,
+                `❌ You do not have enough balance! Your current balance is ${currentBalance.toFixed(2)} ৳.`
+            );
+        }
+
+        userState[chatId].amount = amount;
+        userState[chatId].step = 'AWAITING_CONFIRMATION';
+
+        const confirmKeyboard = {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: '✅ Confirm Withdraw', callback_data: 'confirm_withdraw' },
+                        { text: '❌ Cancel', callback_data: 'cancel_withdraw' }
+                    ]
+                ]
+            }
+        };
+
+        return bot.sendMessage(
+            chatId,
+            `⚠️ *Confirm Withdraw*\n\n` +
+            `🔹 Method: ${userState[chatId].method}\n` +
+            `📞 Number: \`${userState[chatId].walletNumber}\`\n` +
+            `💰 Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
+            `Click the button below to confirm:`,
+            {
+                parse_mode: 'Markdown',
+                ...confirmKeyboard
+            }
+        );
+    }
+
     if (text.includes('GET ACTIVE NUMBER') || text.includes('REFRESH')) {
         await showAppsMenu(chatId);
     }
@@ -555,6 +688,75 @@ bot.on('callback_query', async (query) => {
             return showCountriesForApp(chatId, messageId, appName);
         }
 
+        // Withdraw Method Selection Callback
+        if (data && data.startsWith('withdraw_')) {
+            const method = data.replace('withdraw_', '');
+            await bot.answerCallbackQuery(query.id);
+
+            userState[chatId] = {
+                step: 'AWAITING_NUMBER',
+                method: method
+            };
+
+            return bot.editMessageText(
+                `💳 *Selected Method: ${method}*\n\n` +
+                `👉 Please send your ${method} wallet number below:`,
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                }
+            );
+        }
+
+        if (data === 'confirm_withdraw') {
+            await bot.answerCallbackQuery(query.id);
+
+            const state = userState[chatId];
+            if (!state || state.step !== 'AWAITING_CONFIRMATION') {
+                return bot.editMessageText('❌ Session expired. Please try again.', { chat_id: chatId, message_id: messageId });
+            }
+
+            const dataObj = getUserData(chatId);
+            const amount = state.amount;
+            const method = state.method;
+            const walletNumber = state.walletNumber;
+
+            dataObj.totalWithdrawn += amount;
+            delete userState[chatId];
+
+            const userTag = query.from.username ? `@${query.from.username}` : `[User](tg://user?id=${chatId})`;
+
+            const adminMsg = 
+                `🚨 *New Withdrawal Request!*\n\n` +
+                `👤 *User:* ${userTag}\n` +
+                `🆔 *Chat ID:* \`${chatId}\`\n` +
+                `💳 *Method:* \`${method}\`\n` +
+                `📞 *Wallet:* \`${walletNumber}\`\n` +
+                `💵 *Amount:* \`${amount.toFixed(2)}\` ৳`;
+
+            try {
+                await bot.sendMessage(config.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' });
+            } catch (e) {
+                console.error('Failed to send withdraw request to admin:', e.message);
+            }
+
+            return bot.editMessageText(
+                `✅ *Withdrawal Request Submitted Successfully!*\n\n` +
+                `Method: \`${method}\`\n` +
+                `Number: \`${walletNumber}\`\n` +
+                `Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
+                `Your request has been sent to the admin. Please wait for payment.`,
+                { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' }
+            );
+        }
+
+        if (data === 'cancel_withdraw') {
+            await bot.answerCallbackQuery(query.id, { text: 'Withdraw cancelled' });
+            delete userState[chatId];
+            return bot.editMessageText('❌ Withdrawal request has been cancelled.', { chat_id: chatId, message_id: messageId });
+        }
+
         if (data && data.startsWith('num_')) {
             const parts = data.split('_');
             const targetRange = parts[1];
@@ -563,7 +765,6 @@ bot.on('callback_query', async (query) => {
             await bot.answerCallbackQuery(query.id, { text: 'Allocating number...' });
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId });
 
-            // getNewNumber এপিআই কল (রেন্ডার লগ অনুযায়ী ফাংশনটি এখন সরাসরি এক্সিকিউট হবে)
             const actualNumResult = await getNewNumber(targetRange);
             
             if (!actualNumResult || !actualNumResult.data) {
@@ -575,7 +776,6 @@ bot.on('callback_query', async (query) => {
             const finalCountry = phoneData.country || phoneData.country_name || 'Global';
             const flagEmoji = getCountryFlag(finalCountry);
 
-            // অটো ওটিপি ট্র্যাকার চালু করা হলো
             startFastOtpChecker(chatId, phoneNumber);
 
             const numberKeyboard = {
@@ -591,7 +791,6 @@ bot.on('callback_query', async (query) => {
 
             return bot.editMessageText(
                 `⚡ *━━━ RIFAT OTP SERVICE ━━━* ⚡\n\n` +
-                `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
                 `🎯 *Service:* \`${appName}\`\n` +
                 `${flagEmoji} *Country:* \`${finalCountry}\`\n` +
                 `📞 *Number:* \`${phoneNumber}\`\n\n` +
