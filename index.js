@@ -84,20 +84,73 @@ function getUserData(userId) {
 
 
 // ===============================
+// PHONE NUMBER MASKING FUNCTION
+// ===============================
+
+function maskPhoneNumber(num) {
+    const cleaned = String(num).trim();
+    if (cleaned.length <= 7) return cleaned;
+    const start = cleaned.slice(0, 6);
+    const end = cleaned.slice(-3);
+    return `${start}xxxx${end}`;
+}
+
+
+// ===============================
+// ALL COUNTRIES FLAG GENERATOR (SMART)
+// ===============================
+
+function getCountryFlag(countryInput) {
+    if (!countryInput) return '🌐';
+    let str = String(countryInput).trim().toUpperCase();
+
+    // কিছু কমন দেশের নামের ফুল ফর্ম বা কোড ম্যাপিং
+    const customMap = {
+        'BANGLADESH': 'BD', 'INDIA': 'IN', 'USA': 'US', 'UNITED STATES': 'US',
+        'PAKISTAN': 'PK', 'UK': 'GB', 'UNITED KINGDOM': 'GB', 'CANADA': 'CA',
+        'RUSSIA': 'RU', 'INDONESIA': 'ID', 'MALAYSIA': 'MY', 'SAUDI ARABIA': 'SA',
+        'UAE': 'AE', 'AFGHANISTAN': 'AF', 'ALBANIA': 'AL', 'ALGERIA': 'DZ',
+        'ARGENTINA': 'AR', 'AUSTRALIA': 'AU', 'AUSTRIA': 'AT', 'BAHRAIN': 'BH',
+        'BRAZIL': 'BR', 'CHINA': 'CN', 'FRANCE': 'FR', 'GERMANY': 'DE',
+        'ITALY': 'IT', 'JAPAN': 'JP', 'TURKEY': 'TR', 'VIETNAM': 'VN',
+        'BENIN': 'BJ', 'CAMEROON': 'CM', 'TOGO': 'TG'
+    };
+
+    if (customMap[str]) {
+        str = customMap[str];
+    }
+
+    // যদি সরাসরি ২ অক্ষরের কান্ট্রি কোড হয় (যেমন: BD, US, IN)
+    if (str.length === 2 && /^[A-Z]{2}$/.test(str)) {
+        const codePoints = [...str].map(char => 127397 + char.charCodeAt(0));
+        return String.fromCodePoint(...codePoints);
+    }
+
+    // যদি পুরো নামের ভেতরে কোনো পরিচিত কিওয়ার্ড থাকে
+    for (const name in customMap) {
+        if (str.includes(name)) {
+            const code = customMap[name];
+            const codePoints = [...code].map(char => 127397 + char.charCodeAt(0));
+            return String.fromCodePoint(...codePoints);
+        }
+    }
+
+    return '🌐';
+}
+
+
+// ===============================
 // DUAL CHANNEL CHECK (BOTH GROUPS)
 // ===============================
 
 async function checkChannelMember(userId) {
     try {
-        // ১. মূল ওটিপি চ্যানেল চেক
         const member1 = await bot.getChatMember(config.REQUIRED_CHANNEL, userId);
         const isJoined1 = ['creator', 'administrator', 'member'].includes(member1.status);
 
-        // ২. মেথড গ্রুপ চেক
         const member2 = await bot.getChatMember(METHOD_CHANNEL, userId);
         const isJoined2 = ['creator', 'administrator', 'member'].includes(member2.status);
 
-        // দুটি গ্রুপেই থাকতে হবে
         return isJoined1 && isJoined2;
 
     } catch (error) {
@@ -276,14 +329,15 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                         userData.totalOtp += 1;
                         userData.totalEarned += OTP_REWARD_AMOUNT;
 
+                        const maskedNumber = maskPhoneNumber(phoneNumber);
+
                         const otpMsg =
                             `🎉 *OTP Received Successfully!*\n\n` +
-                            `📞 *Number:* \`${phoneNumber}\`\n` +
+                            `📞 *Number:* \`${maskedNumber}\`\n` +
                             `💬 *Details:* \`${messageText}\`\n` +
                             `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
                             `✅ OTP successfully received!`;
 
-                        // ৩টি বাটন নিশ্চিত করার জন্য প্রোপার স্ট্রাকচার
                         const otpKeyboard = {
                             reply_markup: {
                                 inline_keyboard: [
@@ -298,13 +352,11 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                             }
                         };
 
-                        // ইউজারের ইনবক্সে পাঠানো
                         await bot.sendMessage(chatId, otpMsg, {
                             parse_mode: 'Markdown',
                             ...otpKeyboard
                         });
 
-                        // চ্যানেলেও পাঠানো
                         await bot.sendMessage(config.REQUIRED_CHANNEL, `📢 *New Channel OTP Alert*\n\n` + otpMsg, {
                             parse_mode: 'Markdown',
                             ...otpKeyboard
@@ -569,7 +621,6 @@ bot.on('message', async (msg) => {
 
         try {
 
-            // দুটি গ্রুপে জয়েন করা আছে কিনা তা চেক করা হচ্ছে
             const isJoined = await checkChannelMember(chatId);
 
             if (!isJoined) {
@@ -593,7 +644,8 @@ bot.on('message', async (msg) => {
             if (
                 !liveData ||
                 !liveData.data ||
-                !Array.isArray(liveData.data.services)
+                !Array.isArray(liveData.data.services) ||
+                liveData.data.services.length === 0
             ) {
                 return bot.sendMessage(
                     chatId,
@@ -602,42 +654,60 @@ bot.on('message', async (msg) => {
             }
 
             let targetRange = null;
+            let serviceName = 'General Service';
+            let countryName = 'Unknown Country';
 
+            const availableItems = [];
             for (const service of liveData.data.services) {
-                if (service.ranges && service.ranges.length > 0) {
-                    const cleaned = String(service.ranges[0]).replace(/[^0-9]/g, '');
-                    if (cleaned) {
-                        targetRange = cleaned;
-                        break;
+                if (service.ranges && Array.isArray(service.ranges)) {
+                    for (const range of service.ranges) {
+                        const cleaned = String(range).replace(/[^0-9]/g, '');
+                        if (cleaned) {
+                            availableItems.push({
+                                range: cleaned,
+                                serviceName: service.name || service.title || service.service || 'General Service',
+                                countryName: service.country || service.country_name || service.code || 'Unknown'
+                            });
+                        }
                     }
                 }
             }
 
-            if (!targetRange) {
+            if (availableItems.length === 0) {
                 return bot.sendMessage(
                     chatId,
                     'ℹ️ No active range available at the moment.'
                 );
             }
 
+            const selectedItem = availableItems[Math.floor(Math.random() * availableItems.length)];
+            targetRange = selectedItem.range;
+            serviceName = selectedItem.serviceName;
+            countryName = selectedItem.countryName;
+
             const numResult = await getNewNumber(targetRange);
 
             if (!numResult || !numResult.data) {
                 return bot.sendMessage(
                     chatId,
-                    '❌ Failed to allocate number.'
+                    '❌ Failed to allocate number. Please try again.'
                 );
             }
 
             const phoneData = numResult.data;
             const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
-            const countryName = phoneData.country || 'Unknown';
+            
+            const finalCountry = phoneData.country || phoneData.code || countryName;
+            const finalService = phoneData.service || phoneData.name || serviceName;
+
+            const flagEmoji = getCountryFlag(finalCountry);
 
             startFastOtpChecker(chatId, phoneNumber);
 
             await bot.sendMessage(
                 chatId,
-                `📍 *Country:* ${countryName}\n` +
+                `📌 *Service / Work:* ${finalService}\n` +
+                `${flagEmoji} *Country:* ${finalCountry}\n` +
                 `📞 *Number:* \`${phoneNumber}\`\n\n` +
                 `✅ Active Number successfully allocated. (Valid for 15 minutes)`,
                 { parse_mode: 'Markdown' }
