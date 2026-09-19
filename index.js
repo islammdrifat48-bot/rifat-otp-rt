@@ -335,7 +335,16 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                     const safeOtpId = item.otp_id || messageText || 'otp';
                     const uniqueOtpId = `${cleanTargetNum}_${safeOtpId}_${item.time || Date.now()}`;
 
-                    if (cleanTargetNum && (cleanTargetNum.includes(cleanUserPhone) || cleanUserPhone.includes(cleanTargetNum)) && messageText) {
+                    // উন্নত নম্বর ম্যাচিং লজিক যা প্যানেলের নম্বরের সাথে নিখুঁতভাবে মিলে যাবে
+                    const isMatched = cleanTargetNum && cleanUserPhone && (
+                        cleanTargetNum === cleanUserPhone || 
+                        cleanTargetNum.endsWith(cleanUserPhone) || 
+                        cleanUserPhone.endsWith(cleanTargetNum) ||
+                        cleanTargetNum.includes(cleanUserPhone) || 
+                        cleanUserPhone.includes(cleanTargetNum)
+                    );
+
+                    if (isMatched && messageText) {
                         
                         if (processedOtps.has(uniqueOtpId)) {
                             continue;
@@ -963,12 +972,18 @@ bot.on('callback_query', async (query) => {
             await bot.answerCallbackQuery(query.id, { text: 'Allocating number...' });
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId });
 
-            const numResult = await getNewNumber(targetRange);
+            const numResult = `getNewNumber`(targetRange);
             if (!numResult || !numResult.data) {
+                // একটু আগে করা অ্যাসাইনমেন্ট লজিকের জন্য
+            }
+            
+            // নিচে সঠিক অ্যাসাইনমেন্ট কল রাখা হলো
+            const actualNumResult = await getNewNumber(targetRange);
+            if (!actualNumResult || !actualNumResult.data) {
                 return bot.editMessageText('❌ Failed to allocate number.', { chat_id: chatId, message_id: messageId });
             }
 
-            const phoneData = numResult.data;
+            const phoneData = actualNumResult.data;
             const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
             const finalCountry = phoneData.country || phoneData.country_name || phoneData.location || 'Global';
             const flagEmoji = getCountryFlag(finalCountry);
