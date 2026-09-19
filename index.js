@@ -247,16 +247,26 @@ async function showAppsMenu(chatId, messageId = null) {
         }
 
         const liveData = await getLiveAccess();
+        console.log('API LiveData Response:', JSON.stringify(liveData));
+
         if (!liveData) {
             const errText = '❌ No active services available from panel right now.';
             if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
             return bot.sendMessage(chatId, errText);
         }
 
-        const servicesList = Array.isArray(liveData) ? liveData : (liveData.services || liveData.data || Object.values(liveData));
-        const items = Array.isArray(servicesList) ? servicesList : Object.values(servicesList);
+        let items = [];
+        if (Array.isArray(liveData)) {
+            items = liveData;
+        } else if (liveData.services && Array.isArray(liveData.services)) {
+            items = liveData.services;
+        } else if (liveData.data && Array.isArray(liveData.data)) {
+            items = liveData.data;
+        } else {
+            items = Object.values(liveData).flat();
+        }
 
-        if (items.length === 0) {
+        if (!items || items.length === 0) {
             const errText = '❌ No active services available from panel right now.';
             if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
             return bot.sendMessage(chatId, errText);
@@ -265,7 +275,7 @@ async function showAppsMenu(chatId, messageId = null) {
         const appsSet = new Set();
         items.forEach(service => {
             if (!service) return;
-            const sName = service.name || service.title || service.service || service.app_name || service.service_name || service.platform || service.category;
+            const sName = service.name || service.title || service.service || service.app_name || service.service_name || service.platform || service.category || service.app;
             if (sName) {
                 appsSet.add(String(sName).trim());
             }
@@ -290,6 +300,12 @@ async function showAppsMenu(chatId, messageId = null) {
             inlineKeyboard.push(row);
         }
 
+        if (inlineKeyboard.length === 0) {
+            const errText = '❌ Services found, but failed to parse app names.';
+            if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
+            return bot.sendMessage(chatId, errText);
+        }
+
         const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n👇 Select your desired app/service below to check available countries & numbers:`;
         const reply_markup = { inline_keyboard: inlineKeyboard };
 
@@ -312,15 +328,23 @@ async function showCountriesForApp(chatId, messageId, appName) {
         const liveData = await getLiveAccess();
         if (!liveData) return;
 
-        const servicesList = Array.isArray(liveData) ? liveData : (liveData.services || liveData.data || Object.values(liveData));
-        const items = Array.isArray(servicesList) ? servicesList : Object.values(servicesList);
+        let items = [];
+        if (Array.isArray(liveData)) {
+            items = liveData;
+        } else if (liveData.services && Array.isArray(liveData.services)) {
+            items = liveData.services;
+        } else if (liveData.data && Array.isArray(liveData.data)) {
+            items = liveData.data;
+        } else {
+            items = Object.values(liveData).flat();
+        }
 
         const inlineKeyboard = [];
         let row = [];
 
         items.forEach(service => {
             if (!service) return;
-            const sName = String(service.name || service.title || service.service || service.app_name || service.service_name || service.platform || service.category || '').trim();
+            const sName = String(service.name || service.title || service.service || service.app_name || service.service_name || service.platform || service.category || service.app || '').trim();
             
             if (sName.toLowerCase() === appName.toLowerCase()) {
                 const country = service.country || service.country_name || service.code || service.location || 'Global';
@@ -382,8 +406,7 @@ bot.on('message', async (msg) => {
     if (text.includes('Balance')) return sendBalance(chatId);
 
     if (text.includes('Support')) {
-        const username = String(config.SUPPORT_USERNAME || 'admin').replace('@', '');
-        return bot.sendMessage(chatId, `🎧 *Customer Support*\n\nContact Admin: t.me/${username}`, { parse_mode: 'Markdown' });
+        return bot.sendMessage(chatId, `🎧 *Customer Support*\n\nContact Admin: t.me/RIFAT_OTP_EARNING`, { parse_mode: 'Markdown' });
     }
 
     if (text.includes('Withdraw')) {
