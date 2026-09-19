@@ -8,7 +8,9 @@ const {
     getSuccessOtp
 } = require('./api');
 
-// Bot initialization with explicit polling options and webhook disable
+// ===============================
+// BOT INITIALIZATION
+// ===============================
 const bot = new TelegramBot(config.BOT_TOKEN, {
     polling: {
         interval: 300,
@@ -21,9 +23,8 @@ const bot = new TelegramBot(config.BOT_TOKEN, {
 });
 
 // ===============================
-// ERROR HANDLING
+// ERROR HANDLING LISTENERS
 // ===============================
-
 process.on('unhandledRejection', (reason) => {
     console.error('Unhandled Rejection:', reason);
 });
@@ -40,11 +41,11 @@ bot.on('error', (error) => {
     console.error('Bot Error:', error.message);
 });
 
-// Check Telegram connection
+// Check Telegram connection info
 bot.getMe()
     .then((me) => {
         console.log('=================================');
-        console.log('BOT CONNECTED');
+        console.log('BOT CONNECTED SUCCESSFULLY');
         console.log('Username:', '@' + me.username);
         console.log('Bot ID:', me.id);
         console.log('=================================');
@@ -53,11 +54,9 @@ bot.getMe()
         console.error('BOT CONNECTION FAILED:', error.message);
     });
 
-
 // ===============================
-// USER DATA & SECURITY MAP
+// USER DATA & STATE STORAGE
 // ===============================
-
 const userLocks = {};
 const userState = {};
 const userBalance = {};
@@ -66,9 +65,7 @@ const processedOtps = new Set();
 const MIN_WITHDRAW_AMOUNT = 100.00;
 const OTP_REWARD_AMOUNT = 0.70;
 
-// মেথড গ্রুপের ইউজারনেম (বট চালানোর সময় এই গ্রুপে জয়েন করা বাধ্যতামূলক)
 const METHOD_CHANNEL = '@otpmethod_r';
-
 
 function getUserData(userId) {
     if (!userBalance[userId]) {
@@ -78,15 +75,12 @@ function getUserData(userId) {
             totalWithdrawn: 0
         };
     }
-
     return userBalance[userId];
 }
 
-
 // ===============================
-// PHONE NUMBER MASKING FUNCTION
+// PHONE NUMBER MASKING
 // ===============================
-
 function maskPhoneNumber(num) {
     const cleaned = String(num).trim();
     if (cleaned.length <= 7) return cleaned;
@@ -95,11 +89,9 @@ function maskPhoneNumber(num) {
     return `${start}xxxx${end}`;
 }
 
-
 // ===============================
-// ALL COUNTRIES FLAG GENERATOR (SMART)
+// COUNTRY FLAG GENERATOR
 // ===============================
-
 function getCountryFlag(countryInput) {
     if (!countryInput) return '🌐';
     let str = String(countryInput).trim().toUpperCase();
@@ -112,7 +104,8 @@ function getCountryFlag(countryInput) {
         'ARGENTINA': 'AR', 'AUSTRALIA': 'AU', 'AUSTRIA': 'AT', 'BAHRAIN': 'BH',
         'BRAZIL': 'BR', 'CHINA': 'CN', 'FRANCE': 'FR', 'GERMANY': 'DE',
         'ITALY': 'IT', 'JAPAN': 'JP', 'TURKEY': 'TR', 'VIETNAM': 'VN',
-        'BENIN': 'BJ', 'CAMEROON': 'CM', 'TOGO': 'TG', 'IVORY COAST': 'CI'
+        'GUINEA': 'GN', 'MADAGASCAR': 'MG', 'BENIN': 'BJ', 'CAMEROON': 'CM', 
+        'TOGO': 'TG', 'IVORY COAST': 'CI', 'NIGERIA': 'NG'
     };
 
     if (customMap[str]) {
@@ -135,11 +128,9 @@ function getCountryFlag(countryInput) {
     return '🌐';
 }
 
-
 // ===============================
-// DUAL CHANNEL CHECK (BOTH GROUPS)
+// CHANNEL MEMBERSHIP CHECK
 // ===============================
-
 async function checkChannelMember(userId) {
     try {
         const member1 = await bot.getChatMember(config.REQUIRED_CHANNEL, userId);
@@ -149,18 +140,15 @@ async function checkChannelMember(userId) {
         const isJoined2 = ['creator', 'administrator', 'member'].includes(member2.status);
 
         return isJoined1 && isJoined2;
-
     } catch (error) {
         console.error('Channel check error:', error.message);
         return false;
     }
 }
 
-
 // ===============================
-// MAIN MENU
+// MAIN KEYBOARD LAYOUT
 // ===============================
-
 const mainMenu = {
     reply_markup: {
         keyboard: [
@@ -180,11 +168,9 @@ const mainMenu = {
     }
 };
 
-
 // ===============================
-// /START
+// START COMMAND HANDLER
 // ===============================
-
 bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
     const chatId = msg.chat.id;
     delete userState[chatId];
@@ -208,11 +194,9 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
     }
 });
 
-
 // ===============================
-// /STAT & BALANCE FUNCTION
+// STAT / BALANCE COMMAND HANDLER
 // ===============================
-
 bot.onText(/^\/stat(?:@\w+)?$/, async (msg) => {
     await sendBalance(msg.chat.id);
 });
@@ -242,11 +226,9 @@ async function sendBalance(chatId) {
     }
 }
 
-
 // ===============================
-// SECURE SUCCESS OTP CHECKER
+// FAST OTP CHECKER ENGINE
 // ===============================
-
 async function startFastOtpChecker(chatId, phoneNumber) {
     const startTime = Date.now();
     const maxDurationMs = 15 * 60 * 1000;
@@ -317,12 +299,10 @@ async function startFastOtpChecker(chatId, phoneNumber) {
     }, intervalTime);
 }
 
-
 // ===============================
-// FETCH AND DISPLAY SERVICES DASHBOARD
+// STEP 1: DYNAMIC APPS MENU BUILDER
 // ===============================
-
-async function showServicesDashboard(chatId, messageId = null) {
+async function showAppsMenu(chatId, messageId = null) {
     try {
         const isJoined = await checkChannelMember(chatId);
         if (!isJoined) {
@@ -345,49 +325,46 @@ async function showServicesDashboard(chatId, messageId = null) {
             return bot.sendMessage(chatId, errText);
         }
 
-        // সেবাগুলোর ইউনিক লিস্ট তৈরি করা (যেমন: Telegram, Imo, WhatsApp, Facebook ইত্যাদি)
-        const servicesMap = {};
-        for (const service of liveData.data.services) {
+        // প্যানেল থেকে প্রাপ্ত সার্ভিসগুলোর নাম দিয়ে ইউনিক অ্যাপ লিস্ট তৈরি করা (যেমন: Telegram, Imo ইত্যাদি)
+        const appsSet = new Set();
+        liveData.data.services.forEach(service => {
             const sName = service.name || service.title || service.service || 'General Service';
-            if (!servicesMap[sName]) {
-                servicesMap[sName] = 0;
-            }
-            if (service.ranges && Array.isArray(service.ranges)) {
-                servicesMap[sName] += service.ranges.length;
-            }
-        }
+            appsSet.add(sName);
+        });
 
         const inlineKeyboard = [];
         let row = [];
 
-        for (const sName of Object.keys(servicesMap)) {
+        appsSet.forEach(appName => {
             row.push({
-                text: `📱 ${sName} (${servicesMap[sName]})`,
-                callback_data: `srv_${sName.substring(0, 30)}`
+                text: `📱 ${appName}`,
+                callback_data: `app_${appName}`
             });
+
             if (row.length === 2) {
                 inlineKeyboard.push(row);
                 row = [];
             }
-        }
+        });
+
         if (row.length > 0) {
             inlineKeyboard.push(row);
         }
 
-        const dashText = `🎛️ *RIFAT OTP DASHBOARD*\n\n` +
+        const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n` +
             `👇 Select your desired app/service below to check available countries & numbers:`;
 
         const replyMarkup = { reply_markup: { inline_keyboard: inlineKeyboard } };
 
         if (messageId) {
-            return bot.editMessageText(dashText, {
+            return bot.editMessageText(menuText, {
                 chat_id: chatId,
                 message_id: messageId,
                 parse_mode: 'Markdown',
                 ...replyMarkup
             });
         } else {
-            return bot.sendMessage(chatId, dashText, {
+            return bot.sendMessage(chatId, menuText, {
                 parse_mode: 'Markdown',
                 ...replyMarkup
             });
@@ -399,11 +376,80 @@ async function showServicesDashboard(chatId, messageId = null) {
     }
 }
 
+// ===============================
+// STEP 2: SHOW COUNTRIES FOR SELECTED APP
+// ===============================
+async function showCountriesForApp(chatId, messageId, appName) {
+    try {
+        const liveData = await getLiveAccess();
+        if (!liveData || !liveData.data || !Array.isArray(liveData.data.services)) {
+            return bot.editMessageText('❌ Failed to fetch panel data.', { chat_id: chatId, message_id: messageId });
+        }
+
+        const inlineKeyboard = [];
+        let row = [];
+
+        liveData.data.services.forEach(service => {
+            const sName = service.name || service.title || service.service || 'General Service';
+            if (sName.toLowerCase() === appName.toLowerCase()) {
+                const country = service.country || service.country_name || service.code || 'Global';
+                const flag = getCountryFlag(country);
+                
+                let rangeVal = '';
+                if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
+                    rangeVal = String(service.ranges[0]).replace(/[^0-9]/g, '');
+                } else if (service.range) {
+                    rangeVal = String(service.range).replace(/[^0-9]/g, '');
+                } else if (service.number) {
+                    rangeVal = String(service.number).replace(/[^0-9]/g, '');
+                }
+
+                if (rangeVal) {
+                    row.push({
+                        text: `${flag} ${country}`,
+                        callback_data: `num_${rangeVal}_${appName}`
+                    });
+
+                    if (row.length === 2) {
+                        inlineKeyboard.push(row);
+                        row = [];
+                    }
+                }
+            }
+        });
+
+        if (row.length > 0) {
+            inlineKeyboard.push(row);
+        }
+
+        inlineKeyboard.push([{ text: '⬅️ Back to Apps Menu', callback_data: 'back_to_apps' }]);
+
+        if (inlineKeyboard.length <= 1) {
+            return bot.editMessageText(`❌ No active country ranges found for *${appName}*.`, {
+                chat_id: chatId,
+                message_id: messageId,
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: [[{ text: '⬅️ Back', callback_data: 'back_to_apps' }]] }
+            });
+        }
+
+        return bot.editMessageText(
+            `📱 *App:* \`${appName}\`\n\n👇 *Select your desired country below:*`,
+            {
+                chat_id: chatId,
+                message_id: messageId,
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: inlineKeyboard }
+            }
+        );
+    } catch (error) {
+        console.error('Country selection error:', error.message);
+    }
+}
 
 // ===============================
-// MESSAGE HANDLER
+// GENERAL TEXT MESSAGE LISTENER
 // ===============================
-
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text ? msg.text.trim() : '';
@@ -457,7 +503,6 @@ bot.on('message', async (msg) => {
         );
     }
 
-    // Awaiting Wallet Number
     if (userState[chatId] && userState[chatId].step === 'AWAITING_NUMBER') {
         const method = userState[chatId].method;
         const walletNumber = text.replace(/[\s-]/g, '');
@@ -469,7 +514,6 @@ bot.on('message', async (msg) => {
         return bot.sendMessage(chatId, `📲 Account Number Accepted: \`${walletNumber}\`\n\n📥 Now send the amount you want to withdraw:`, { parse_mode: 'Markdown' });
     }
 
-    // Awaiting Amount
     if (userState[chatId] && userState[chatId].step === 'AWAITING_AMOUNT') {
         const amount = Number(text.replace(/,/g, ''));
         if (!Number.isFinite(amount) || amount < MIN_WITHDRAW_AMOUNT) {
@@ -494,17 +538,14 @@ bot.on('message', async (msg) => {
         );
     }
 
-    // GET ACTIVE NUMBER / REFRESH
     if (text.includes('Get Active Number') || text.includes('Refresh Panel')) {
-        await showServicesDashboard(chatId);
+        await showAppsMenu(chatId);
     }
 });
 
-
 // ===============================
-// CALLBACK QUERY HANDLER (DASHBOARD & NUMBERS)
+// CALLBACK QUERY HANDLER
 // ===============================
-
 bot.on('callback_query', async (query) => {
     try {
         if (!query.message || !query.message.chat) return;
@@ -513,7 +554,6 @@ bot.on('callback_query', async (query) => {
         const data = query.data;
         const user = query.from;
 
-        // Withdraw callbacks
         if (data && data.startsWith('withdraw_')) {
             const method = data.split('_')[1];
             userState[chatId] = { step: 'AWAITING_NUMBER', method: method };
@@ -552,81 +592,21 @@ bot.on('callback_query', async (query) => {
             return bot.sendMessage(chatId, '❌ Withdraw request has been cancelled.');
         }
 
-        // Back to Dashboard callback
-        if (data === 'back_to_dashboard') {
+        if (data === 'back_to_apps') {
             await bot.answerCallbackQuery(query.id);
-            return showServicesDashboard(chatId, messageId);
+            return showAppsMenu(chatId, messageId);
         }
 
-        // Service Selected -> Show Country List for that Service
-        if (data && data.startsWith('srv_')) {
-            const selectedService = data.replace('srv_', '');
-            await bot.answerCallbackQuery(query.id, { text: `Loading countries for ${selectedService}...` });
-
-            const liveData = await getLiveAccess();
-            if (!liveData || !liveData.data || !Array.isArray(liveData.data.services)) {
-                return bot.editMessageText('❌ Failed to fetch panel data.', { chat_id: chatId, message_id: messageId });
-            }
-
-            const countryRows = [];
-            let row = [];
-
-            for (const service of liveData.data.services) {
-                const sName = service.name || service.title || service.service || 'General Service';
-                if (sName.startsWith(selectedService)) {
-                    if (service.ranges && Array.isArray(service.ranges)) {
-                        for (let i = 0; i < service.ranges.length; i++) {
-                            const range = service.ranges[i];
-                            const country = service.country || service.country_name || service.code || 'Country';
-                            const flag = getCountryFlag(country);
-                            const cleanedRange = String(range).replace(/[^0-9]/g, '');
-
-                            if (cleanedRange) {
-                                row.push({
-                                    text: `${flag} ${country}`,
-                                    callback_data: `num_${cleanedRange}_${sName.substring(0, 10)}`
-                                });
-                                if (row.length === 2) {
-                                    countryRows.push(row);
-                                    row = [];
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (row.length > 0) {
-                countryRows.push(row);
-            }
-
-            countryRows.push([{ text: '⬅️ Back to Dashboard', callback_data: 'back_to_dashboard' }]);
-
-            if (countryRows.length <= 1) {
-                return bot.editMessageText(`❌ No active country ranges found for *${selectedService}*.`, {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '⬅️ Back', callback_data: 'back_to_dashboard' }]] }
-                });
-            }
-
-            return bot.editMessageText(
-                `📱 *Service:* \`${selectedService}\`\n\n👇 *Select your desired country below:*`,
-                {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: countryRows }
-                }
-            );
+        if (data && data.startsWith('app_')) {
+            const appName = data.replace('app_', '');
+            await bot.answerCallbackQuery(query.id);
+            return showCountriesForApp(chatId, messageId, appName);
         }
 
-        // Country / Range Selected -> Allocate Number and show with 'Change' Button
         if (data && data.startsWith('num_')) {
             const parts = data.split('_');
             const targetRange = parts[1];
-            const serviceShort = parts[2] || 'Service';
+            const appName = parts[2] || 'Service';
 
             await bot.answerCallbackQuery(query.id, { text: 'Allocating active number...' });
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId });
@@ -636,14 +616,14 @@ bot.on('callback_query', async (query) => {
                 return bot.editMessageText('❌ Failed to allocate number. Please try again.', {
                     chat_id: chatId,
                     message_id: messageId,
-                    reply_markup: { inline_keyboard: [[{ text: '⬅️ Back to Dashboard', callback_data: 'back_to_dashboard' }]] }
+                    reply_markup: { inline_keyboard: [[{ text: '⬅️ Back', callback_data: `app_${appName}` }]] }
                 });
             }
 
             const phoneData = numResult.data;
             const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
-            const finalCountry = phoneData.country || phoneData.code || 'Country';
-            const finalService = phoneData.service || phoneData.name || serviceShort;
+            const finalCountry = phoneData.country || phoneData.country_name || phoneData.code || 'Country';
+            const finalService = phoneData.service || phoneData.name || appName;
             const flagEmoji = getCountryFlag(finalCountry);
 
             startFastOtpChecker(chatId, phoneNumber);
@@ -652,10 +632,10 @@ bot.on('callback_query', async (query) => {
                 reply_markup: {
                     inline_keyboard: [
                         [
-                            { text: '🔄 Change Number', callback_data: `num_${targetRange}_${serviceShort}` }
+                            { text: '🔄 Change Number', callback_data: `num_${targetRange}_${appName}` }
                         ],
                         [
-                            { text: '🎛️ App Menu', callback_data: 'back_to_dashboard' }
+                            { text: '⬅️ Back to Countries', callback_data: `app_${appName}` }
                         ]
                     ]
                 }
@@ -683,11 +663,9 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-
 // ===============================
 // HTTP SERVER (RENDER PORT BINDING)
 // ===============================
-
 const server = http.createServer((req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/plain; charset=utf-8'
