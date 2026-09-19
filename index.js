@@ -198,7 +198,7 @@ async function startFastOtpChecker(chatId, phoneNumber) {
         try {
             const otpResult = await getSuccessOtp();
             if (otpResult) {
-                const otpsList = otpResult.otps || otpResult.hits || otpResult.data || otpResult;
+                const otpsList = Array.isArray(otpResult) ? otpResult : (otpResult.otps || otpResult.hits || otpResult.data || Object.values(otpResult));
                 const items = Array.isArray(otpsList) ? otpsList : Object.values(otpsList);
 
                 for (let item of items) {
@@ -253,7 +253,7 @@ async function showAppsMenu(chatId, messageId = null) {
             return bot.sendMessage(chatId, errText);
         }
 
-        const servicesList = liveData.services || liveData.data || liveData;
+        const servicesList = Array.isArray(liveData) ? liveData : (liveData.services || liveData.data || Object.values(liveData));
         const items = Array.isArray(servicesList) ? servicesList : Object.values(servicesList);
 
         if (items.length === 0) {
@@ -291,7 +291,7 @@ async function showAppsMenu(chatId, messageId = null) {
         }
 
         const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n👇 Select your desired app/service below to check available countries & numbers:`;
-        const replyMarkup = { inline_keyboard: inlineKeyboard };
+        const reply_markup = { inline_keyboard: inlineKeyboard };
 
         if (messageId) {
             return bot.editMessageText(menuText, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup });
@@ -312,7 +312,7 @@ async function showCountriesForApp(chatId, messageId, appName) {
         const liveData = await getLiveAccess();
         if (!liveData) return;
 
-        const servicesList = liveData.services || liveData.data || liveData;
+        const servicesList = Array.isArray(liveData) ? liveData : (liveData.services || liveData.data || Object.values(liveData));
         const items = Array.isArray(servicesList) ? servicesList : Object.values(servicesList);
 
         const inlineKeyboard = [];
@@ -360,7 +360,7 @@ async function showCountriesForApp(chatId, messageId, appName) {
         inlineKeyboard.push([{ text: '⬅️ Back to Apps Menu', callback_data: 'back_to_apps' }]);
 
         const countryText = `📱 *App:* \`${appName}\`\n\n👇 Select your desired country below:`;
-        const replyMarkup = { inline_keyboard: inlineKeyboard };
+        const reply_markup = { inline_keyboard: inlineKeyboard };
 
         await bot.editMessageText(countryText, {
             chat_id: chatId,
