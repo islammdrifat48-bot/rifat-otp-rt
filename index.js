@@ -113,7 +113,7 @@ function getCountryFlag(countryInput) {
         'ARGENTINA': 'AR', 'AUSTRALIA': 'AU', 'AUSTRIA': 'AT', 'BAHRAIN': 'BH',
         'BRAZIL': 'BR', 'CHINA': 'CN', 'FRANCE': 'FR', 'GERMANY': 'DE',
         'ITALY': 'IT', 'JAPAN': 'JP', 'TURKEY': 'TR', 'VIETNAM': 'VN',
-        'BENIN': 'BJ', 'CAMEROON': 'CM', 'TOGO': 'TG'
+        'BENIN': 'BJ', 'CAMEROON': 'CM', 'TOGO': 'TG', 'IVORY COAST': 'CI'
     };
 
     if (customMap[str]) {
@@ -161,17 +161,17 @@ async function checkChannelMember(userId) {
 
 
 // ===============================
-// MAIN MENU
+// MAIN MENU (PREMIUM STYLISH BUTTONS)
 // ===============================
 
 const mainMenu = {
     reply_markup: {
         keyboard: [
             [
-                { text: '📱 Get Active Number' }
+                { text: '⚡ Get Active Number ⚡' }
             ],
             [
-                { text: '💰 Balance' },
+                { text: '💰 My Balance' },
                 { text: '💸 Withdraw' }
             ],
             [
@@ -201,11 +201,11 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
         await bot.sendMessage(
             chatId,
 
-            `👋 *RIFAT_SMS* Bot service is active!\n\n` +
-            `💡 *Per OTP Reward:* ${OTP_REWARD_AMOUNT} ৳\n` +
+            `🚀 *Welcome to RIFAT OTP SERVICE* 🚀\n\n` +
+            `✨ Fast, secure, and reliable automated OTP bot.\n\n` +
+            `💡 *Per OTP Reward:* \`${OTP_REWARD_AMOUNT} ৳\`\n` +
             `⏱️ *Time Limit:* OTP must arrive within 15 minutes.\n\n` +
-            `Click *Get Active Number* to get a number or click *Balance* to check earnings.\n\n` +
-            `📌 *Minimum Withdraw: 100 ৳*`,
+            `👇 Click *Get Active Number* below to start working!`,
 
             {
                 parse_mode: 'Markdown',
@@ -250,7 +250,8 @@ async function sendBalance(chatId) {
         data.totalWithdrawn;
 
     const balanceMsg =
-        `📊 *Your Account Statement:*\n\n` +
+        `📊 *Your Account Statement*\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
         `🔢 *Total Received OTP:* \`${data.totalOtp}\`\n` +
         `💵 *Total Earnings:* \`${data.totalEarned.toFixed(2)}\` ৳\n` +
         `🏧 *Total Withdrawal:* \`${data.totalWithdrawn.toFixed(2)}\` ৳\n` +
@@ -332,21 +333,21 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                         const maskedNumber = maskPhoneNumber(phoneNumber);
 
                         const otpMsg =
-                            `🎉 *OTP Received Successfully!*\n\n` +
+                            `🎉 *OTP Received Successfully!* 🎉\n\n` +
                             `📞 *Number:* \`${maskedNumber}\`\n` +
                             `💬 *Details:* \`${messageText}\`\n` +
-                            `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
-                            `✅ OTP successfully received!`;
+                            `💰 *Reward Added:* \`+${OTP_REWARD_AMOUNT} ৳\`\n\n` +
+                            `✅ Great job! Keep working.`;
 
                         const otpKeyboard = {
                             reply_markup: {
                                 inline_keyboard: [
                                     [
-                                        { text: 'OTP Group', url: 'https://t.me/otpgroup_rt' },
-                                        { text: 'Method', url: 'https://t.me/otpmethod_r' }
+                                        { text: '📢 OTP Channel', url: 'https://t.me/otpgroup_rt' },
+                                        { text: '📚 Method Group', url: 'https://t.me/otpmethod_r' }
                                     ],
                                     [
-                                        { text: 'Number', url: 'https://t.me/rifatearningrt_bot' }
+                                        { text: '🤖 Main Bot', url: 'https://t.me/rifatearningrt_bot' }
                                     ]
                                 ]
                             }
@@ -433,7 +434,7 @@ bot.on('message', async (msg) => {
 
                     [
                         {
-                            text: '👨‍💻 Contact Admin',
+                            text: '👨‍💻 Contact Admin Support',
                             url: `https://t.me/${username}`
                         }
                     ]
@@ -447,8 +448,8 @@ bot.on('message', async (msg) => {
         return bot.sendMessage(
             chatId,
 
-            `🎧 *Support*\n\n` +
-            `For any issues or inquiries, click the button below to contact the Admin.`,
+            `🎧 *Customer Support*\n\n` +
+            `Facing any issues or need help? Click the button below to directly contact our Admin.`,
 
             {
                 parse_mode: 'Markdown',
@@ -478,7 +479,7 @@ bot.on('message', async (msg) => {
 
                     [
                         {
-                            text: '🌸 Bkash',
+                            text: '🌸 bKash',
                             callback_data: 'withdraw_Bkash'
                         },
                         {
@@ -505,9 +506,10 @@ bot.on('message', async (msg) => {
 
             chatId,
 
-            `💳 *Select Withdraw Method*\n\n` +
-            `💰 Current Balance: \`${currentBalance.toFixed(2)}\` ৳\n` +
-            `📌 Minimum Withdraw: *100 ৳*`,
+            `💳 *Withdrawal Gateway*\n\n` +
+            `💰 Available Balance: \`${currentBalance.toFixed(2)}\` ৳\n` +
+            `📌 Minimum Withdraw: *100.00 ৳*\n\n` +
+            `👇 *Select your payment method below:*`,
 
             {
                 parse_mode: 'Markdown',
@@ -535,7 +537,7 @@ bot.on('message', async (msg) => {
 
             return bot.sendMessage(
                 chatId,
-                `❌ Please provide a valid ${method} number.`
+                `❌ Please provide a valid ${method} account number.`
             );
 
         }
@@ -545,8 +547,8 @@ bot.on('message', async (msg) => {
 
         return bot.sendMessage(
             chatId,
-            `📲 Number accepted: \`${walletNumber}\`\n\n` +
-            `Now send the amount of money you want to withdraw:`,
+            `📲 Account Number Accepted: \`${walletNumber}\`\n\n` +
+            `📥 Now send the amount you want to withdraw:`,
             {
                 parse_mode: 'Markdown'
             }
@@ -580,7 +582,7 @@ bot.on('message', async (msg) => {
             reply_markup: {
                 inline_keyboard: [
                     [
-                        { text: '✅ Confirm Withdraw', callback_data: 'confirm_withdraw' },
+                        { text: '✅ Confirm Request', callback_data: 'confirm_withdraw' },
                         { text: '❌ Cancel', callback_data: 'cancel_withdraw' }
                     ]
                 ]
@@ -589,11 +591,11 @@ bot.on('message', async (msg) => {
 
         return bot.sendMessage(
             chatId,
-            `⚠️ *Confirm Withdraw*\n\n` +
-            `🔹 Method: ${userState[chatId].method}\n` +
+            `⚠️ *Withdrawal Summary*\n\n` +
+            `🔹 Method: \`${userState[chatId].method}\`\n` +
             `📞 Number: \`${userState[chatId].walletNumber}\`\n` +
             `💰 Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
-            `Click the button below to confirm:`,
+            `👇 Click below to confirm your request:`,
             {
                 parse_mode: 'Markdown',
                 ...confirmKeyboard
@@ -704,12 +706,16 @@ bot.on('message', async (msg) => {
 
             startFastOtpChecker(chatId, phoneNumber);
 
+            // স্টাইলিশ ও প্রিমিয়াম ডিজাইন মেসেজ
             await bot.sendMessage(
                 chatId,
-                `📌 *Service / Work:* ${finalService}\n` +
-                `${flagEmoji} *Country:* ${finalCountry}\n` +
+                `⚡ *━━━ RIFAT OTP SERVICE ━━━* ⚡\n\n` +
+                `🎯 *Service / Work:* \`${finalService}\`\n` +
+                `${flagEmoji} *Country:* \`${finalCountry}\`\n` +
                 `📞 *Number:* \`${phoneNumber}\`\n\n` +
-                `✅ Active Number successfully allocated. (Valid for 15 minutes)`,
+                `✅ *Status:* Active Number Allocated\n` +
+                `⏰ *Validity:* 15 Minutes\n\n` +
+                `✨ _Complete your work within the time limit!_`,
                 { parse_mode: 'Markdown' }
             );
 
@@ -762,7 +768,7 @@ bot.on('callback_query', async (query) => {
             await bot.sendMessage(
                 chatId,
                 `📲 *${method}* selected.\n\n` +
-                `Now send your *${method} number*:`,
+                `Now send your *${method} account number*:`,
                 {
                     parse_mode: 'Markdown'
                 }
@@ -803,8 +809,8 @@ bot.on('callback_query', async (query) => {
 
             await bot.sendMessage(
                 chatId,
-                `✅ *Withdraw Request submitted successfully!*\n\n` +
-                `🔹 Method: ${method}\n` +
+                `✅ *Withdraw Request Submitted!*\n\n` +
+                `🔹 Method: \`${method}\`\n` +
                 `📞 Number: \`${walletNumber}\`\n` +
                 `💰 Amount: \`${amount.toFixed(2)}\` ৳\n\n` +
                 `⏳ Payment will be sent soon after Admin verification.`,
@@ -816,7 +822,7 @@ bot.on('callback_query', async (query) => {
                 `📥 *New Withdraw Request (Success)*\n\n` +
                 `👤 User: ${username}\n` +
                 `🆔 ID: \`${chatId}\`\n` +
-                `💳 Method: ${method}\n` +
+                `💳 Method: \`${method}\`\n` +
                 `📞 Number: \`${walletNumber}\`\n` +
                 `💰 Amount: \`${amount.toFixed(2)}\` ৳`,
                 { parse_mode: 'Markdown' }
