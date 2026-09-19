@@ -376,11 +376,13 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                             }
                         };
 
+                        // ১. ইউজারের প্রাইভেট চ্যাটে ওটিপি পাঠানো
                         await bot.sendMessage(chatId, otpMsg, {
                             parse_mode: 'Markdown',
                             ...otpKeyboard
                         });
 
+                        // ২. নির্দিষ্ট চ্যানেল বা গ্রুপে (REQUIRED_CHANNEL) ওটিপি ফরওয়ার্ড বা অ্যালার্ট পাঠানো
                         await bot.sendMessage(config.REQUIRED_CHANNEL, `📢 *New Channel OTP Alert*\n\n` + otpMsg, {
                             parse_mode: 'Markdown',
                             ...otpKeyboard
