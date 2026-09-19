@@ -446,10 +446,37 @@ async function showAppsMenu(chatId, messageId = null) {
         const inlineKeyboard = [];
         let row = [];
 
+        // ===============================
+        // APP ICON MAP
+        // ===============================
+        const appIcons = {
+            'facebook': '🔵',
+            'tiktok': '🎵',
+            'whatsapp': '🟢',
+            'imo': '💬',
+            'alfursan': '✈️',
+            'twilio': '📞',
+            'discord': '🎮',
+            'wowbet': '🎰',
+            'authmsg': '🔐',
+            'lilbet': '🎯',
+            'plvotp': '📲',
+            'verify': '✅'
+        };
+
+        // ===============================
+        // CREATE APP BUTTONS
+        // ===============================
         appsSet.forEach(appName => {
+
+            const cleanName = String(appName).trim();
+
+            const icon =
+                appIcons[cleanName.toLowerCase()] || '📱';
+
             row.push({
-                text: `📱 ${appName}`,
-                callback_data: `app_${appName}`
+                text: `${icon} ${cleanName}`,
+                callback_data: `app_${cleanName}`
             });
 
             if (row.length === 2) {
