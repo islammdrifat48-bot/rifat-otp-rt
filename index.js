@@ -253,7 +253,6 @@ async function showAppsMenu(chatId, messageId = null) {
             return bot.sendMessage(chatId, errText);
         }
 
-        // ভল্টেক্স প্যানেলের রেসপন্স থেকে সার্ভিস লিস্ট বের করে নেওয়া
         const servicesList = liveData.services || liveData.data || liveData;
         const items = Array.isArray(servicesList) ? servicesList : Object.values(servicesList);
 
@@ -361,11 +360,13 @@ async function showCountriesForApp(chatId, messageId, appName) {
         inlineKeyboard.push([{ text: '⬅️ Back to Apps Menu', callback_data: 'back_to_apps' }]);
 
         const countryText = `📱 *App:* \`${appName}\`\n\n👇 Select your desired country below:`;
+        const replyMarkup = { inline_keyboard: inlineKeyboard };
+
         await bot.editMessageText(countryText, {
             chat_id: chatId,
             message_id: messageId,
             parse_mode: 'Markdown',
-            reply_markup: { inline_keyboard: inlineKeyboard }
+            reply_markup
         });
     } catch (error) {}
 }
@@ -476,49 +477,4 @@ bot.on('callback_query', async (query) => {
             await bot.answerCallbackQuery(query.id, { text: 'Allocating number...' });
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId });
 
-            const numResult = await getNewNumber(targetRange);
-            if (!numResult) {
-                return bot.editMessageText('❌ Failed to allocate number.', { chat_id: chatId, message_id: messageId });
-            }
-
-            const phoneData = numResult.data || numResult;
-            const phoneNumber = phoneData.full_number || phoneData.number || phoneData.phone || 'N/A';
-            const finalCountry = phoneData.country || phoneData.country_name || phoneData.location || 'Global';
-            const flagEmoji = getCountryFlag(finalCountry);
-
-            startFastOtpChecker(chatId, phoneNumber);
-
-            const numberKeyboard = {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '🔄 Change Number', callback_data: `num_${targetRange}_${appName}` }],
-                        [{ text: '⬅️ Back to Countries', callback_data: `app_${appName}` }]
-                    ]
-                }
-            };
-
-            return bot.editMessageText(
-                `⚡ *━━━ RIFAT OTP SERVICE ━━━* ⚡\n\n` +
-                `🎯 *Service:* \`${appName}\`\n` +
-                `${flagEmoji} *Country:* \`${finalCountry}\`\n` +
-                `📞 *Number:* \`${phoneNumber}\`\n\n` +
-                `✅ *Status:* Active Number Allocated\n` +
-                `⏰ *Validity:* 15 Minutes`,
-                { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', ...numberKeyboard }
-            );
-        }
-    } catch (error) {}
-});
-
-// ===============================
-// HTTP SERVER
-// ===============================
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('RIFAT_SMS Bot is active and running!');
-});
-
-const PORT = process.env.PORT || 10000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is listening on port ${PORT}`);
-});
+...
