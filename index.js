@@ -144,22 +144,32 @@ async function checkChannelMember(userId) {
 
 
 // ===============================
-// MAIN MENU
+// MAIN MENU (COLORFUL EMOJI BUTTONS)
 // ===============================
 
 const mainMenu = {
     reply_markup: {
         keyboard: [
             [
-                { text: '📱 Get Active Number' }
+                { text: '🟢 GET ACTIVE NUMBER' },
+                { text: '🔵 TRAFFIC' }
             ],
             [
-                { text: '💰 Balance' },
-                { text: '💸 Withdraw' }
+                { text: '🔴 GET 2FA' },
+                { text: '🟢 BALANCE' }
             ],
             [
-                { text: '🔄 Refresh Panel' },
-                { text: '💬 Support' }
+                { text: '🔵 REFER & EARN' },
+                { text: '🏆 LEADERBOARD' }
+            ],
+            [
+                { text: '🔵 FAKE NAME' },
+                { text: '🟢 SUPPORT' }
+            ],
+            [
+                { text: '📊 XLSX SYSTEM' },
+                { text: '🛒 PROXY BUY' },
+                { text: '💸 WITHDRAW' }
             ]
         ],
         resize_keyboard: true
@@ -496,7 +506,7 @@ async function showCountriesForApp(chatId, messageId, appName) {
                 if (rangeVal) {
                     row.push({
                         text: `${flag} ${country}`,
-                        callback_data: `num_${rangeVal}_${appName}`
+                        callback_data: `num_${rangeVal}_${encodeURIComponent(appName)}`
                     });
 
                     if (row.length === 2) {
@@ -557,7 +567,7 @@ bot.on('message', async (msg) => {
     // ===========================
 
     if (
-        text.includes('Balance') ||
+        text.includes('BALANCE') ||
         text.toLowerCase() === 'stat'
     ) {
 
@@ -570,7 +580,7 @@ bot.on('message', async (msg) => {
     // SUPPORT
     // ===========================
 
-    if (text.includes('Support')) {
+    if (text.includes('SUPPORT')) {
 
         delete userState[chatId];
 
@@ -612,7 +622,7 @@ bot.on('message', async (msg) => {
     // WITHDRAW BUTTON CLICK
     // ===========================
 
-    if (text.includes('Withdraw') || text.includes('💸')) {
+    if (text.includes('WITHDRAW') || text.includes('💸')) {
 
         delete userState[chatId];
 
@@ -757,8 +767,8 @@ bot.on('message', async (msg) => {
     // ===========================
 
     if (
-        text.includes('Get Active Number') ||
-        text.includes('Refresh Panel')
+        text.includes('GET ACTIVE NUMBER') ||
+        text.includes('REFRESH')
     ) {
         await showAppsMenu(chatId);
     }
@@ -879,7 +889,7 @@ bot.on('callback_query', async (query) => {
         if (data && data.startsWith('num_')) {
             const parts = data.split('_');
             const targetRange = parts[1];
-            const appName = parts[2] || 'Service';
+            const appName = decodeURIComponent(parts[2] || 'Service');
 
             await bot.answerCallbackQuery(query.id, { text: 'Allocating number...' });
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId });
@@ -900,7 +910,7 @@ bot.on('callback_query', async (query) => {
                 reply_markup: {
                     inline_keyboard: [
                         [
-                            { text: '🔄 Change Number', callback_data: `num_${targetRange}_${appName}` },
+                            { text: '🔄 Change Number', callback_data: `num_${targetRange}_${encodeURIComponent(appName)}` },
                             { text: '⬅️ Back to Countries', callback_data: `app_${appName}` }
                         ]
                     ]
