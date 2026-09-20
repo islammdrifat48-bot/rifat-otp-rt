@@ -70,6 +70,7 @@ const PUBLIC_UID = 'MQUPBWI9AQJ';
 const METHOD_CHANNEL = '@otpmethod_r';
 const ADMIN_IDS = ['6315111273'];
 
+// কাস্টম অ্যাপ ও রেঞ্জ স্টোরেজ (যত খুশি অ্যাড করা যাবে)
 let customAdminApps = [];
 
 
@@ -182,6 +183,9 @@ const mainMenu = {
             [
                 { text: '🟢 SUPPORT' },
                 { text: '💸 WITHDRAW' }
+            ],
+            [
+                { text: '👑 ADMIN PANEL' }
             ]
         ],
         resize_keyboard: true
@@ -217,9 +221,8 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
     }
 });
 
-bot.onText(/^\/admin(?:@\w+)?$/, async (msg) => {
-    const chatId = String(msg.chat.id);
-    if (!ADMIN_IDS.includes(chatId)) {
+async function sendAdminPanel(chatId) {
+    if (!ADMIN_IDS.includes(String(chatId))) {
         return bot.sendMessage(chatId, '❌ You are not authorized to use the admin panel.');
     }
 
@@ -237,6 +240,10 @@ bot.onText(/^\/admin(?:@\w+)?$/, async (msg) => {
         parse_mode: 'Markdown',
         ...adminKeyboard
     });
+}
+
+bot.onText(/^\/admin(?:@\w+)?$/, async (msg) => {
+    await sendAdminPanel(msg.chat.id);
 });
 
 
@@ -276,8 +283,6 @@ async function sendBalance(chatId, userName = 'User') {
 async function sendLeaderboard(chatId) {
     try {
         const usersArray = Object.values(userBalance);
-        
-        // যাদের ওটিপি ০ এর বেশি শুধু তাদের ফিল্টার করে সাজানো এবং সর্বোচ্চ ১০ জন দেখানো
         usersArray.sort((a, b) => b.totalOtp - a.totalOtp);
         const topUsers = usersArray.filter(u => u.totalOtp > 0).slice(0, 10);
 
@@ -401,7 +406,7 @@ async function startFastOtpChecker(chatId, phoneNumber, userName = 'User') {
 
 
 // ===============================
-// STEP 1: APPS MENU BUILDER
+// STEP 1: APPS MENU BUILDER (CUSTOM APPS ON TOP)
 // ===============================
 async function showAppsMenu(chatId, messageId = null) {
     try {
@@ -421,19 +426,12 @@ async function showAppsMenu(chatId, messageId = null) {
         const rawServices = liveData?.data?.services || liveData?.data || [];
         const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
 
-        const appsSet = new Set();
-        
+        const apiAppsSet = new Set();
         items.forEach(service => {
             if (!service) return;
             const sName = service.sid || service.name || service.title || service.service || service.app_name;
             if (sName) {
-                appsSet.add(String(sName).trim());
-            }
-        });
-
-        customAdminApps.forEach(item => {
-            if (item.appName) {
-                appsSet.add(String(item.appName).trim());
+                apiAppsSet.add(String(sName).trim());
             }
         });
 
@@ -449,18 +447,41 @@ async function showAppsMenu(chatId, messageId = null) {
             'discord': '🎮'
         };
 
-        appsSet.forEach(appName => {
+        // ১. কাস্টম অ্যাডমিন অ্যাপস সবার উপরে যোগ করা হবে
+        customAdminApps.forEach(item => {
+            if (item.appName) {
+                const cleanName = String(item.appName).trim();
+                const icon = appIcons[cleanName.toLowerCase()] || '🚀';
+                
+                row.push({
+                    text: `${icon}${cleanName} ✅`,
+                    callback_data: `app_${cleanName}`
+                });
+
+                if (row.length === 2) {
+                    inlineKeyboard.push(row);
+                    row = [];
+                }
+            }
+        });
+
+        // ২. বাকি এপিআই অ্যাপগুলো এর নিচে যোগ করা হবে
+        apiAppsSet.forEach(appName => {
             const cleanName = String(appName).trim();
-            const icon = appIcons[cleanName.toLowerCase()] || '📱';
+            // ডুপ্লিকেট এড়াতে কাস্টম লিস্টে না থাকলে যোগ করবে
+            const isCustom = customAdminApps.some(c => c.appName.toLowerCase() === cleanName.toLowerCase());
+            if (!isCustom) {
+                const icon = appIcons[cleanName.toLowerCase()] || '📱';
 
-            row.push({
-                text: `${icon}${cleanName}`,
-                callback_data: `app_${cleanName}`
-            });
+                row.push({
+                    text: `${icon}${cleanName}`,
+                    callback_data: `app_${cleanName}`
+                });
 
-            if (row.length === 2) {
-                inlineKeyboard.push(row);
-                row = [];
+                if (row.length === 2) {
+                    inlineKeyboard.push(row);
+                    row = [];
+                }
             }
         });
 
@@ -491,6 +512,23 @@ async function showCountriesForApp(chatId, messageId, appName) {
         const inlineKeyboard = [];
         let row = [];
 
+        // ১. অ্যাডমিন প্যানেল থেকে দেওয়া কাস্টম রেঞ্জ ও দেশ সবার আগে দেখাবে
+        customAdminApps.forEach(item => {
+            if (item.appName.toLowerCase() === appName.toLowerCase()) {
+                const flag = getCountryFlag(item.countryName);
+                row.push({
+                    text: `${flag} ${item.countryName} (${item.range})`,
+                    callback_data: `num_${item.range}_${encodeURIComponent(appName)}`
+                });
+
+                if (row.length === 2) {
+                    inlineKeyboard.push(row);
+                    row = [];
+                }
+            }
+        });
+
+        // ২. এপিআই থেকে রেঞ্জগুলো খোঁজা
         const liveData = await getLiveAccess();
         if (liveData && liveData.data) {
             const rawServices = liveData.data.services || liveData.data;
@@ -528,21 +566,6 @@ async function showCountriesForApp(chatId, messageId, appName) {
             });
         }
 
-        customAdminApps.forEach(item => {
-            if (item.appName.toLowerCase() === appName.toLowerCase()) {
-                const flag = getCountryFlag(item.countryName);
-                row.push({
-                    text: `${flag} ${item.countryName} (${item.range})`,
-                    callback_data: `num_${item.range}_${encodeURIComponent(appName)}`
-                });
-
-                if (row.length === 2) {
-                    inlineKeyboard.push(row);
-                    row = [];
-                }
-            }
-        });
-
         if (row.length > 0) {
             inlineKeyboard.push(row);
         }
@@ -574,6 +597,11 @@ bot.on('message', async (msg) => {
     const text = msg.text ? msg.text.trim() : '';
 
     if (!text) return;
+
+    // যদি ইউজার নতুন কোনো মেনু বা কমান্ডে যায়, তবে পুরনো স্টেট ক্লিয়ার করা হলো যাতে বাটন ফ্রিজ না হয়
+    if (text.startsWith('/') || text.includes('GET ACTIVE NUMBER') || text.includes('BALANCE') || text.includes('LEADERBOARD') || text.includes('SUPPORT') || text.includes('WITHDRAW') || text.includes('ADMIN PANEL')) {
+        delete userState[chatId];
+    }
 
     // --- ADMIN PANEL STEPS ---
     if (ADMIN_IDS.includes(chatId)) {
@@ -656,7 +684,6 @@ bot.on('message', async (msg) => {
     }
 
     if (text.startsWith('/start') || text.startsWith('/admin') || text.startsWith('/stat')) return;
-    if (userLocks[chatId]) return;
 
     if (text.includes('BALANCE') || text.toLowerCase() === 'stat') {
         return sendBalance(chatId, userName);
@@ -664,6 +691,10 @@ bot.on('message', async (msg) => {
 
     if (text.includes('LEADERBOARD')) {
         return sendLeaderboard(chatId);
+    }
+
+    if (text.includes('ADMIN PANEL')) {
+        return sendAdminPanel(chatId);
     }
 
     if (text.includes('WITHDRAW')) {
@@ -775,6 +806,7 @@ bot.on('callback_query', async (query) => {
         }
 
         if (data === 'back_to_apps') {
+            delete userState[chatId];
             return showAppsMenu(chatId, messageId);
         }
 
