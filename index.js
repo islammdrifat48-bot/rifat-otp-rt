@@ -1,21 +1,11 @@
-module.exports = {
-    BOT_TOKEN: '8960115471:AAHn0MVQ6E4LtVGQSSgOktUTHx5vqOOM0aU',
-    VOLTX_API_KEY: 'MA8O4Z4K4VX',
-    REQUIRED_CHANNEL: '@otpgroup_rt',
-    SUPPORT_USERNAME: 'RIFAT_OTP_EARNING',
-    ADMIN_CHAT_ID: '6315111273',
-    BASE_URL: 'https://api.2oo9.cloud/MXS47FLFX0U/tnevs/@public/api'
-};
-
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 
 const config = require('./config');
 const {
     getLiveAccess,
-    getSuccessOtp,
-    axiosInstance,
-    getHeaders
+    getNewNumber,
+    getSuccessOtp
 } = require('./api');
 
 // Bot initialization with explicit polling options and webhook disable
@@ -65,70 +55,38 @@ bot.getMe()
 
 
 // ===============================
-// EXACT getNewNumber FUNCTION
-// ===============================
-async function getNewNumber(rangeId) {
-    try {
-        const payload = {};
-
-        if (rangeId) {
-            payload.rid = String(rangeId).replace(/[^0-9]/g, '');
-        }
-
-        const response = await axiosInstance.post(
-            `${config.BASE_URL}/getnum`,
-            payload,
-            {
-                headers: getHeaders()
-            }
-        );
-
-        return response.data;
-
-    } catch (error) {
-        if (error.response) {
-            console.error('API getNewNumber error status:', error.response.status);
-            console.error('API getNewNumber error data:', error.response.data);
-        } else {
-            console.error('API getNewNumber error:', error.message);
-        }
-
-        return null;
-    }
-}
-
-
-// ===============================
 // USER DATA & SECURITY MAP
 // ===============================
 
+const userLocks = {};
 const userState = {};
 const userBalance = {};
 const processedOtps = new Set();
 
-const MIN_WITHDRAW_AMOUNT = 100.00; // উইথড্র লিমিট ১০০ টাকা করা হলো (স্ক্রিনশট অনুযায়ী)
+// অ্যাডমিন আইডি এবং কনফিগারেশন
+const ADMIN_ID = 6315111273;
+const MIN_WITHDRAW_AMOUNT = 500.00; // ন্যূনতম উইথড্র ৫০০ টাকা
 const OTP_REWARD_AMOUNT = 0.70;
 
+// পাবলিক ইউআইডি (UID) কনফিগারেশন
+const PUBLIC_UID = 'MQUPBWI9AQJ';
+
+// মেথড গ্রুপের ইউজারনেম
 const METHOD_CHANNEL = '@otpmethod_r';
-const ADMIN_IDS = ['6315111273'];
 
-// কাস্টম অ্যাপ ও রেঞ্জ স্টোরেজ
-let customAppsData = {};
+// কাস্টম অ্যাপ ও রেঞ্জ সংরক্ষণের জন্য অবজেক্ট
+let customApps = {};
 
 
-function getUserData(userId, userName = 'User') {
+function getUserData(userId) {
     if (!userBalance[userId]) {
         userBalance[userId] = {
-            name: userName,
             totalOtp: 0,
             totalEarned: 0,
             totalWithdrawn: 0
         };
-    } else {
-        if (userName && userName !== 'User') {
-            userBalance[userId].name = userName;
-        }
     }
+
     return userBalance[userId];
 }
 
@@ -188,13 +146,11 @@ function getCountryFlag(countryInput) {
 
 
 // ===============================
-// DUAL CHANNEL CHECK (BYPASS FOR ADMIN OR ERROR SAFETY)
+// DUAL CHANNEL CHECK
 // ===============================
 
 async function checkChannelMember(userId) {
     try {
-        if (ADMIN_IDS.includes(String(userId))) return true;
-
         const member1 = await bot.getChatMember(config.REQUIRED_CHANNEL, userId);
         const isJoined1 = ['creator', 'administrator', 'member'].includes(member1.status);
 
@@ -204,7 +160,7 @@ async function checkChannelMember(userId) {
         return isJoined1 && isJoined2;
     } catch (error) {
         console.error('Channel check error:', error.message);
-        return true; // চ্যানেল চেক ফেইল করলে যাতে ইউজার আটকে না যায়
+        return false;
     }
 }
 
@@ -227,9 +183,6 @@ const mainMenu = {
             [
                 { text: '🟢 SUPPORT' },
                 { text: '💸 WITHDRAW' }
-            ],
-            [
-                { text: '👑 ADMIN PANEL' }
             ]
         ],
         resize_keyboard: true
@@ -238,20 +191,19 @@ const mainMenu = {
 
 
 // ===============================
-// /START & /ADMIN
+// /START COMMAND
 // ===============================
 
 bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
     const chatId = msg.chat.id;
-    const userName = msg.from.first_name || 'User';
     delete userState[chatId];
-    getUserData(chatId, userName);
+    getUserData(chatId);
 
     try {
         await bot.sendMessage(
             chatId,
             `👋 *RIFAT_SMS* Bot service is active!\n\n` +
-            `🆔 *UID:* \`${chatId}\`\n` +
+            `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
             `💡 *Per OTP Reward:* ${OTP_REWARD_AMOUNT} ৳\n` +
             `⏱️ *Time Limit:* OTP must arrive within 15 minutes.\n\n` +
             `Click *Get Active Number* to get a number or click *Balance* to check earnings.\n\n` +
@@ -266,45 +218,19 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
     }
 });
 
-async function sendAdminPanel(chatId, messageId = null) {
-    if (!ADMIN_IDS.includes(String(chatId))) {
-        return bot.sendMessage(chatId, '❌ You are not authorized to use the admin panel.');
-    }
-
-    const adminKeyboard = {
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: '➕ Add New App', callback_data: 'admin_add_app' }],
-                [{ text: '➕ Add Range to App (+)', callback_data: 'admin_manage_ranges' }],
-                [{ text: '🗑️ Delete App / Range', callback_data: 'admin_delete_menu' }],
-                [{ text: '📋 View Custom Apps', callback_data: 'admin_view_custom' }]
-            ]
-        }
-    };
-
-    const text = `⚙️ *ADMIN CONTROL PANEL*\n\nআপনার কাস্টম অ্যাপ ও রেঞ্জ ম্যানেজ করুন:`;
-    if (messageId) {
-        return bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: adminKeyboard.reply_markup }).catch(() => {});
-    }
-    return bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: adminKeyboard.reply_markup });
-}
-
-bot.onText(/^\/admin(?:@\w+)?$/, async (msg) => {
-    await sendAdminPanel(msg.chat.id);
-});
-
 
 // ===============================
 // BALANCE FUNCTION
 // ===============================
 
-async function sendBalance(chatId, userName = 'User') {
+async function sendBalance(chatId) {
     delete userState[chatId];
-    const data = getUserData(chatId, userName);
+    const data = getUserData(chatId);
     const currentBalance = data.totalEarned - data.totalWithdrawn;
 
     const balanceMsg =
         `📊 *Your Account Statement:*\n\n` +
+        `🆔 *Public UID:* \`${PUBLIC_UID}\`\n` +
         `🔢 *Total Received OTP:* \`${data.totalOtp}\`\n` +
         `💵 *Total Earnings:* \`${data.totalEarned.toFixed(2)}\` ৳\n` +
         `🏧 *Total Withdrawal:* \`${data.totalWithdrawn.toFixed(2)}\` ৳\n` +
@@ -324,44 +250,10 @@ async function sendBalance(chatId, userName = 'User') {
 
 
 // ===============================
-// LEADERBOARD FUNCTION
+// SECURE SUCCESS OTP CHECKER
 // ===============================
 
-async function sendLeaderboard(chatId) {
-    try {
-        const usersArray = Object.values(userBalance);
-        usersArray.sort((a, b) => b.totalOtp - a.totalOtp);
-        const topUsers = usersArray.filter(u => u.totalOtp > 0).slice(0, 10);
-
-        let lbText = `🏆 *TOP OTP EARNERS LEADERBOARD* 🏆\n\n`;
-
-        if (topUsers.length === 0) {
-            lbText += `📭 এখনও কেউ সফলভাবে কোনো ওটিপি রিসিভ করেনি!`;
-        } else {
-            topUsers.forEach((user, index) => {
-                let medal = '🥉';
-                if (index === 0) medal = '🥇';
-                else if (index === 1) medal = '🥈';
-
-                lbText += `${medal} *${user.name}* — 📦 *${user.totalOtp}* OTPs\n`;
-            });
-        }
-
-        await bot.sendMessage(chatId, lbText, {
-            parse_mode: 'Markdown',
-            reply_markup: mainMenu.reply_markup
-        });
-    } catch (error) {
-        console.error('Leaderboard error:', error.message);
-    }
-}
-
-
-// ===============================
-// SECURE SUCCESS OTP CHECKER (ORIGINAL & UNCHANGED)
-// ===============================
-
-async function startFastOtpChecker(chatId, phoneNumber, userName = 'User') {
+async function startFastOtpChecker(chatId, phoneNumber) {
     const startTime = Date.now();
     const maxDurationMs = 15 * 60 * 1000;
     const intervalTime = 1000;
@@ -408,13 +300,14 @@ async function startFastOtpChecker(chatId, phoneNumber, userName = 'User') {
                         processedOtps.add(uniqueOtpId);
                         clearInterval(interval);
 
-                        const userData = getUserData(chatId, userName);
+                        const userData = getUserData(chatId);
                         userData.totalOtp += 1;
                         userData.totalEarned += OTP_REWARD_AMOUNT;
                         const maskedNumber = maskPhoneNumber(phoneNumber);
 
                         const otpMsg =
                             `🎉 *OTP Received Successfully!*\n\n` +
+                            `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
                             `📞 *Number:* \`${maskedNumber}\`\n` +
                             `💬 *Details:* \`${messageText}\`\n` +
                             `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
@@ -426,6 +319,9 @@ async function startFastOtpChecker(chatId, phoneNumber, userName = 'User') {
                                     [
                                         { text: 'OTP Group', url: 'https://t.me/otpgroup_rt' },
                                         { text: 'Method', url: 'https://t.me/otpmethod_r' }
+                                    ],
+                                    [
+                                        { text: 'Number', url: 'https://t.me/rifatearningrt_bot' }
                                     ]
                                 ]
                             }
@@ -453,7 +349,7 @@ async function startFastOtpChecker(chatId, phoneNumber, userName = 'User') {
 
 
 // ===============================
-// STEP 1: APPS MENU BUILDER (SAFE FALLBACK FIX)
+// STEP 1: APPS MENU BUILDER (API + CUSTOM APPS)
 // ===============================
 async function showAppsMenu(chatId, messageId = null) {
     try {
@@ -469,6 +365,33 @@ async function showAppsMenu(chatId, messageId = null) {
             return;
         }
 
+        const liveData = await getLiveAccess();
+        const appsSet = new Set();
+
+        // API থেকে অ্যাপ ফেচ করা
+        if (liveData && liveData.data) {
+            const rawServices = liveData.data.services || liveData.data;
+            const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
+            items.forEach(service => {
+                if (!service) return;
+                const sName = service.sid || service.name || service.title || service.service || service.app_name;
+                if (sName) {
+                    appsSet.add(String(sName).trim());
+                }
+            });
+        }
+
+        // অ্যাডমিন প্যানেল থেকে যুক্ত করা কাস্টম অ্যাপগুলো যোগ করা
+        Object.keys(customApps).forEach(appName => {
+            appsSet.add(appName);
+        });
+
+        if (appsSet.size === 0) {
+            const errText = '❌ No active services available right now.';
+            if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
+            return bot.sendMessage(chatId, errText);
+        }
+
         const inlineKeyboard = [];
         let row = [];
 
@@ -481,14 +404,13 @@ async function showAppsMenu(chatId, messageId = null) {
             'discord': '🎮'
         };
 
-        // ১. কাস্টম অ্যাপস সবার উপরে দেখাবে
-        Object.keys(customAppsData).forEach(appName => {
+        appsSet.forEach(appName => {
             const cleanName = String(appName).trim();
-            const icon = appIcons[cleanName.toLowerCase()] || '🚀';
-            
+            const icon = appIcons[cleanName.toLowerCase()] || '📱';
+
             row.push({
-                text: `${icon}${cleanName} ✅`,
-                callback_data: `custom_app_${cleanName}`
+                text: `${icon}${cleanName}`,
+                callback_data: `app_${cleanName}`
             });
 
             if (row.length === 2) {
@@ -497,69 +419,50 @@ async function showAppsMenu(chatId, messageId = null) {
             }
         });
 
-        // ২. লাইভ এপিআই থেকে সার্ভিস লোড করার চেষ্টা (এপিআই ফেইল করলেও ক্র্যাশ বা এরর দেখাবে না)
-        try {
-            const liveData = await getLiveAccess();
-            const rawServices = liveData?.data?.services || liveData?.data || [];
-            const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
-
-            items.forEach(service => {
-                if (!service) return;
-                const sName = service.sid || service.name || service.title || service.service || service.app_name;
-                if (sName) {
-                    const cleanName = String(sName).trim();
-                    if (!customAppsData[cleanName]) {
-                        const icon = appIcons[cleanName.toLowerCase()] || '📱';
-
-                        row.push({
-                            text: `${icon}${cleanName}`,
-                            callback_data: `app_${cleanName}`
-                        });
-
-                        if (row.length === 2) {
-                            inlineKeyboard.push(row);
-                            row = [];
-                        }
-                    }
-                }
-            });
-        } catch (apiErr) {
-            console.log('Live access API offline or empty, showing available options.');
-        }
-
         if (row.length > 0) {
             inlineKeyboard.push(row);
         }
 
-        // যদি কোনো অ্যাপ বা সার্ভিস না থাকে, ডিফল্ট কিছু ডেমো বা মেসেজ দেখাবে যাতে Failed না আসে
-        if (inlineKeyboard.length === 0) {
-            inlineKeyboard.push([{ text: '➕ Admin Panel এ গিয়ে অ্যাপ ও রেঞ্জ যোগ করুন', callback_data: 'admin_back' }]);
-        }
-
-        const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n👇 Select your desired app/service below:`;
+        const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n🆔 *UID:* \`${PUBLIC_UID}\`\n\n👇 Select your desired app/service below:`;
         const reply_markup = { inline_keyboard: inlineKeyboard };
 
         if (messageId) {
-            return bot.editMessageText(menuText, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup }).catch(() => {});
+            return bot.editMessageText(menuText, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup });
         } else {
             return bot.sendMessage(chatId, menuText, { parse_mode: 'Markdown', reply_markup });
         }
     } catch (error) {
         console.error('ShowAppsMenu Error:', error);
-        await bot.sendMessage(chatId, '❌ মেনু লোড করতে সমস্যা হয়েছে। দয়া করে একটু পরে চেষ্টা করুন।');
+        await bot.sendMessage(chatId, '❌ Failed to load services.');
     }
 }
 
 
 // ===============================
-// STEP 2: SHOW COUNTRIES FOR API APP
+// STEP 2: SHOW COUNTRIES/RANGES FOR SELECTED APP
 // ===============================
 async function showCountriesForApp(chatId, messageId, appName) {
     try {
         const inlineKeyboard = [];
         let row = [];
 
-        const liveData = await getLiveAccess().catch(() => null);
+        // যদি অ্যাপটি অ্যাডমিনের দেওয়া কাস্টম অ্যাপ হয়
+        if (customApps[appName] && customApps[appName].length > 0) {
+            customApps[appName].forEach(rangeVal => {
+                row.push({
+                    text: `🌐 Range (${rangeVal})`,
+                    callback_data: `num_${rangeVal}_${encodeURIComponent(appName)}`
+                });
+
+                if (row.length === 2) {
+                    inlineKeyboard.push(row);
+                    row = [];
+                }
+            });
+        }
+
+        // API থেকে প্রাপ্ত সার্ভিসগুলোর রেঞ্জ চেক করা
+        const liveData = await getLiveAccess();
         if (liveData && liveData.data) {
             const rawServices = liveData.data.services || liveData.data;
             const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
@@ -574,9 +477,9 @@ async function showCountriesForApp(chatId, messageId, appName) {
                     
                     let rangeVal = '';
                     if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
-                        rangeVal = String(service.ranges[0]);
+                        rangeVal = String(service.ranges[0]).replace(/[^0-9]/g, '');
                     } else if (service.range) {
-                        rangeVal = String(service.range);
+                        rangeVal = String(service.range).replace(/[^0-9]/g, '');
                     } else if (service.rid) {
                         rangeVal = String(service.rid);
                     }
@@ -610,7 +513,7 @@ async function showCountriesForApp(chatId, messageId, appName) {
             message_id: messageId,
             parse_mode: 'Markdown',
             reply_markup
-        }).catch(() => {});
+        });
     } catch (error) {
         console.error('ShowCountriesForApp Error:', error);
     }
@@ -618,188 +521,155 @@ async function showCountriesForApp(chatId, messageId, appName) {
 
 
 // ===============================
-// STEP 2.1: SHOW COUNTRIES FOR CUSTOM APP
-// ===============================
-async function showCustomAppCountries(chatId, messageId, appName) {
-    try {
-        const inlineKeyboard = [];
-        let row = [];
-
-        const appData = customAppsData[appName];
-        if (appData && appData.ranges && appData.ranges.length > 0) {
-            appData.ranges.forEach((item, index) => {
-                row.push({
-                    text: `${item.flag} ${item.countryName} (${item.range})`,
-                    callback_data: `fetch_custom_num_${appName}_${index}`
-                });
-
-                if (row.length === 2) {
-                    inlineKeyboard.push(row);
-                    row = [];
-                }
-            });
-        }
-
-        if (row.length > 0) {
-            inlineKeyboard.push(row);
-        }
-
-        inlineKeyboard.push([{ text: '⬅️ Back to Apps Menu', callback_data: 'back_to_apps' }]);
-
-        const countryText = `🚀 *Custom App:* \`${appName}\`\n\n👇 Select your desired country/range below:`;
-        const reply_markup = { inline_keyboard: inlineKeyboard };
-
-        await bot.editMessageText(countryText, {
-            chat_id: chatId,
-            message_id: messageId,
-            parse_mode: 'Markdown',
-            reply_markup
-        }).catch(() => {});
-    } catch (error) {
-        console.error('ShowCustomAppCountries Error:', error);
-    }
-}
-
-
-// ===============================
-// MESSAGE HANDLER (TEXT & ADMIN & WITHDRAW)
+// MESSAGE & WITHDRAW HANDLER
 // ===============================
 
 bot.on('message', async (msg) => {
-    const chatId = String(msg.chat.id);
-    const userName = msg.from.first_name || 'User';
+    const chatId = msg.chat.id;
     const text = msg.text ? msg.text.trim() : '';
 
     if (!text) return;
+    if (text.startsWith('/start') || text.startsWith('/stat') || text.startsWith('/admin')) return;
+    if (userLocks[chatId]) return;
 
-    if (text.startsWith('/') || text.includes('GET ACTIVE NUMBER') || text.includes('BALANCE') || text.includes('LEADERBOARD') || text.includes('SUPPORT') || text.includes('WITHDRAW') || text.includes('ADMIN PANEL')) {
-        delete userState[chatId];
-    }
-
-    // --- ADMIN PANEL INPUT STEPS ---
-    if (ADMIN_IDS.includes(chatId)) {
-        if (userState[chatId]?.step === 'waiting_for_new_app_name') {
+    // --- ADMIN TEXT INPUTS ---
+    if (chatId === ADMIN_ID && userState[chatId]) {
+        if (userState[chatId].step === 'ADMIN_WAITING_APP_NAME') {
             const appName = text;
-            if (!customAppsData[appName]) {
-                customAppsData[appName] = { ranges: [] };
+            if (!customApps[appName]) {
+                customApps[appName] = [];
             }
             delete userState[chatId];
-            return bot.sendMessage(chatId, `✅ সফলভাবে কাস্টম অ্যাপ তৈরি হয়েছে: *${appName}*\n\nএখন অ্যাডমিন প্যানেল থেকে **➕ Add Range to App (+)** এ গিয়ে এই অ্যাপে যত খুশি রেঞ্জ যোগ করতে পারবেন।`, { parse_mode: 'Markdown' });
+            return bot.sendMessage(chatId, `✅ অ্যাপ "${appName}" সফলভাবে যোগ করা হয়েছে! এখন রেঞ্জ যোগ করতে `/admin` কমান্ড দিন।`);
         }
 
-        else if (userState[chatId]?.step === 'waiting_for_range_input') {
-            const appName = userState[chatId].appName;
-            const parts = text.split(',').map(p => p.trim());
-            if (parts.length >= 3) {
-                const countryName = parts[0];
-                const flag = parts[1];
-                const range = parts[2];
+        if (userState[chatId].step === 'ADMIN_WAITING_RANGE_DETAILS') {
+            const parts = text.split(':');
+            if (parts.length !== 2) {
+                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে লিখুন। উদাহরণ: \`Telegram:12345\``, { parse_mode: 'Markdown' });
+            }
+            const appName = parts[0].trim();
+            const rangeId = parts[1].trim();
 
-                if (!customAppsData[appName]) {
-                    customAppsData[appName] = { ranges: [] };
+            if (!customApps[appName]) {
+                customApps[appName] = [];
+            }
+            customApps[appName].push(rangeId);
+            delete userState[chatId];
+            return bot.sendMessage(chatId, `✅ অ্যাপ "${appName}" এর জন্য রেঞ্জ "${rangeId}" সফলভাবে যোগ করা হয়েছে!`);
+        }
+
+        if (userState[chatId].step === 'ADMIN_WAITING_DELETE_RANGE') {
+            const parts = text.split(':');
+            if (parts.length !== 2) {
+                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে লিখুন। উদাহরণ: \`Telegram:12345\``, { parse_mode: 'Markdown' });
+            }
+            const appName = parts[0].trim();
+            const rangeId = parts[1].trim();
+
+            if (customApps[appName]) {
+                customApps[appName] = customApps[appName].filter(r => r !== rangeId);
+                if (customApps[appName].length === 0) {
+                    delete customApps[appName];
                 }
-
-                customAppsData[appName].ranges.push({ countryName, flag, range });
                 delete userState[chatId];
-                return bot.sendMessage(chatId, `✅ সফলভাবে রেঞ্জ যোগ করা হয়েছে!\n\nApp: *${appName}*\nCountry: ${flag} *${countryName}*\nRange: \`${range}\``, { parse_mode: 'Markdown' });
+                return bot.sendMessage(chatId, `🗑️ অ্যাপ "${appName}" থেকে রেঞ্জ "${rangeId}" সফলভাবে ডিলিট করা হয়েছে!`);
             } else {
-                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে দিন:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Togo, 🇹🇬, +38091XXX\``, { parse_mode: 'Markdown' });
+                delete userState[chatId];
+                return bot.sendMessage(chatId, `❌ এই নামের কোনো অ্যাপ বা রেঞ্জ পাওয়া যায়নি।`);
             }
         }
     }
 
-    // --- WITHDRAW FLOW STEPS ---
-    if (userState[chatId] && userState[chatId].step === 'waiting_for_withdraw_amount') {
-        const amount = parseFloat(text);
-        const userData = getUserData(chatId, userName);
+    // --- WITHDRAW SYSTEM ---
+    if (text.includes('💸 WITHDRAW')) {
+        const userData = getUserData(chatId);
         const currentBalance = userData.totalEarned - userData.totalWithdrawn;
 
-        if (isNaN(amount) || amount <= 0) {
-            return bot.sendMessage(chatId, `❌ দয়া করে সঠিক সংখ্যায় টাকার পরিমাণ লিখে পাঠান (যেমন: 100 বা 500)।`);
+        // ব্যালেন্স ৫০০ টাকার কম হলে (Failed Notification to Admin & User)
+        if (currentBalance < MIN_WITHDRAW_AMOUNT) {
+            await bot.sendMessage(
+                ADMIN_ID,
+                `❌ *Withdrawal Failed (Low Balance)*\n\n` +
+                `👤 User ID: \`${chatId}\`\n` +
+                `💰 Attempted Balance: \`${currentBalance.toFixed(2)}\` ৳\n` +
+                `📌 Status: *Failed (Minimum ${MIN_WITHDRAW_AMOUNT} ৳ required)*`,
+                { parse_mode: 'Markdown' }
+            );
+
+            return bot.sendMessage(
+                chatId,
+                `❌ *Withdrawal Failed!*\n\nআপনার বর্তমান ব্যালেন্স \`${currentBalance.toFixed(2)}\` ৳। সর্বনিম্ন উইথড্র পরিমাণ \`${MIN_WITHDRAW_AMOUNT}\` ৳।`,
+                { parse_mode: 'Markdown' }
+            );
         }
 
-        if (amount < MIN_WITHDRAW_AMOUNT) {
-            return bot.sendMessage(chatId, `❌ সর্বনিম্ন উইথড্র পরিমাণ হলো *${MIN_WITHDRAW_AMOUNT} ৳*।`, { parse_mode: 'Markdown' });
-        }
-
-        if (amount > currentBalance) {
-            return bot.sendMessage(chatId, `❌ আপনার একাউন্টে পর্যাপ্ত ব্যালেন্স নেই!\nবর্তমান ব্যালেন্স: *${currentBalance.toFixed(2)} ৳*`, { parse_mode: 'Markdown' });
-        }
-
-        const method = userState[chatId].method;
-        userState[chatId] = { step: 'waiting_for_withdraw_number', method: method, amount: amount };
-
-        return bot.sendMessage(chatId, `💳 মাধ্যম: *${method}*\n💰 পরিমাণ: *${amount.toFixed(2)} ৳*\n\nআপনার ব্যক্তিগত **${method}** অ্যাকাউন্ট নম্বরটি লিখে পাঠান:`, { parse_mode: 'Markdown' });
-    }
-
-    if (userState[chatId] && userState[chatId].step === 'waiting_for_withdraw_number') {
-        const method = userState[chatId].method;
-        const amount = userState[chatId].amount;
-        const targetNumber = text;
-        delete userState[chatId];
-
-        const userData = getUserData(chatId, userName);
-        const currentBalance = userData.totalEarned - userData.totalWithdrawn;
-
-        if (amount > currentBalance) {
-            return bot.sendMessage(chatId, `❌ ব্যালেন্স পরিবর্তনের কারণে উইথড্র ব্যর্থ হয়েছে।`);
-        }
-
-        userData.totalWithdrawn += amount;
-        const remainingBalance = (userData.totalEarned - userData.totalWithdrawn);
-
-        const withdrawSlip = 
-            `💸 *New Withdrawal Request!*\n\n` +
-            `👤 *User:* ${userName} (\`${chatId}\`)\n` +
-            `💳 *Method:* \`${method}\`\n` +
-            `📞 *Account Number:* \`${targetNumber}\`\n` +
-            `💰 *Withdraw Amount:* \`${amount.toFixed(2)}\` ৳\n` +
-            `💳 *Remaining Balance:* \`${remainingBalance.toFixed(2)}\` ৳\n\n` +
-            `✅ Status: Sent to Admin Successfully!`;
-
-        await bot.sendMessage(chatId, `✅ আপনার উইথড্র রিকোয়েস্ট সফল হয়েছে!\n\n💳 পদ্ধতি: *${method}*\n📞 নম্বর: \`${targetNumber}\`\n💰 পরিমাণ: *${amount.toFixed(2)} ৳*\n💳 অবশিষ্ট ব্যালেন্স: *${remainingBalance.toFixed(2)} ৳*`, { parse_mode: 'Markdown', ...mainMenu });
+        userState[chatId] = { step: 'SELECT_WD_METHOD' };
         
-        await bot.sendMessage(ADMIN_IDS[0], withdrawSlip, { parse_mode: 'Markdown' });
-        return;
-    }
-
-    if (text.startsWith('/start') || text.startsWith('/admin') || text.startsWith('/stat')) return;
-
-    if (text.includes('BALANCE') || text.toLowerCase() === 'stat') {
-        return sendBalance(chatId, userName);
-    }
-
-    if (text.includes('LEADERBOARD')) {
-        return sendLeaderboard(chatId);
-    }
-
-    if (text.includes('ADMIN PANEL')) {
-        return sendAdminPanel(chatId);
-    }
-
-    if (text.includes('WITHDRAW')) {
-        const userData = getUserData(chatId, userName);
-        const currentBalance = userData.totalEarned - userData.totalWithdrawn;
-
-        if (!ADMIN_IDS.includes(chatId) && currentBalance < MIN_WITHDRAW_AMOUNT) {
-            return bot.sendMessage(chatId, `❌ পর্যাপ্ত ব্যালেন্স নেই! ন্যূনতম উইথড্র: *${MIN_WITHDRAW_AMOUNT} ৳*\nবর্তমান ব্যালেন্স: *${currentBalance.toFixed(2)} ৳*`, { parse_mode: 'Markdown' });
-        }
-
-        const withdrawKeyboard = {
+        const wdKeyboard = {
             reply_markup: {
                 inline_keyboard: [
                     [
-                        { text: '🔴 বিকাশ (Bkash)', callback_data: 'wd_bkash' },
+                        { text: '🔴 বিকাশ (bKash)', callback_data: 'wd_bkash' },
                         { text: '🟠 নগদ (Nagad)', callback_data: 'wd_nagad' }
                     ],
                     [
-                        { text: '🟣 রকেট (Rocket)', callback_data: 'wd_rocket' }
+                        { text: '🔵 রকেট (Rocket)', callback_data: 'wd_rocket' }
+                    ],
+                    [
+                        { text: '❌ বাতিল', callback_data: 'wd_cancel' }
                     ]
                 ]
             }
         };
 
-        return bot.sendMessage(chatId, `🏧 *WITHDRAW SYSTEM*\n\nবর্তমান ব্যালেন্স: *${currentBalance.toFixed(2)} ৳*\nন্যূনতম উইথড্র: *${MIN_WITHDRAW_AMOUNT} ৳*\n\nপেমেন্ট মাধ্যম সিলেক্ট করুন:`, { parse_mode: 'Markdown', ...withdrawKeyboard });
+        return bot.sendMessage(
+            chatId,
+            `💸 *Withdrawal Menu*\n\nআপনার বর্তমান ব্যালেন্স: \`${currentBalance.toFixed(2)}\` ৳\n\nপেমেন্ট নেওয়ার জন্য নিচের মাধ্যমটি সিলেক্ট করুন:`,
+            { parse_mode: 'Markdown', ...wdKeyboard }
+        );
+    }
+
+    // ইউজার যখন পেমেন্ট নম্বর লিখে পাঠাবে
+    if (userState[chatId] && userState[chatId].step === 'WAITING_FOR_WD_NUMBER') {
+        const method = userState[chatId].method;
+        const accountNumber = text;
+        const userData = getUserData(chatId);
+        const currentBalance = userData.totalEarned - userData.totalWithdrawn;
+
+        if (currentBalance < MIN_WITHDRAW_AMOUNT) {
+            delete userState[chatId];
+            return bot.sendMessage(chatId, `❌ পর্যাপ্ত ব্যালেন্স নেই।`);
+        }
+
+        userData.totalWithdrawn += currentBalance;
+        delete userState[chatId];
+
+        // সফল উইথড্র রিকোয়েস্ট অ্যাডমিনের কাছে পাঠানো
+        await bot.sendMessage(
+            ADMIN_ID,
+            `🔔 *New Withdrawal Request (Success)*\n\n` +
+            `👤 User ID: \`${chatId}\`\n` +
+            `💳 Method: *${method}*\n` +
+            `📞 Account: \`${accountNumber}\`\n` +
+            `💵 Amount: \`${currentBalance.toFixed(2)}\` ৳\n` +
+            `✅ Status: *Pending Payment*`,
+            { parse_mode: 'Markdown' }
+        );
+
+        return bot.sendMessage(
+            chatId,
+            `✅ *Withdrawal Request Successful!*\n\n` +
+            `💳 Method: *${method}*\n` +
+            `📞 Account: \`${accountNumber}\`\n` +
+            `💵 Amount: \`${currentBalance.toFixed(2)}\` ৳\n\n` +
+            `আপনার পেমেন্ট রিকোয়েস্ট সফলভাবে জমা হয়েছে। অ্যাডমিন শীঘ্রই চেক করে পাঠিয়ে দেবেন।`,
+            { parse_mode: 'Markdown', reply_markup: mainMenu.reply_markup }
+        );
+    }
+
+    if (text.includes('BALANCE') || text.toLowerCase() === 'stat') {
+        return sendBalance(chatId);
     }
 
     if (text.includes('SUPPORT')) {
@@ -820,6 +690,38 @@ bot.on('message', async (msg) => {
 
 
 // ===============================
+// /ADMIN COMMAND
+// ===============================
+
+bot.onText(/\/admin/, async (msg) => {
+    const chatId = msg.chat.id;
+    if (chatId !== ADMIN_ID) {
+        return bot.sendMessage(chatId, '❌ আপনার এই কমান্ডটি ব্যবহার করার অনুমতি নেই!');
+    }
+
+    const adminKeyboard = {
+        reply_markup: {
+            inline_keyboard: [
+                [
+                    { text: '➕ নতুন অ্যাপ যোগ করুন', callback_data: 'admin_add_app' },
+                    { text: '➕ রেঞ্জ যোগ করুন', callback_data: 'admin_add_range' }
+                ],
+                [
+                    { text: '🗑️ রেঞ্জ ডিলিট করুন', callback_data: 'admin_delete_range' },
+                    { text: '📋 বর্তমান তালিকা দেখুন', callback_data: 'admin_view_list' }
+                ]
+            ]
+        }
+    };
+
+    await bot.sendMessage(chatId, `🛠️ *Admin Control Panel*\n\nনিচের অপশনগুলো থেকে অ্যাপ ও রেঞ্জ ম্যানেজ করুন:`, {
+        parse_mode: 'Markdown',
+        ...adminKeyboard
+    });
+});
+
+
+// ===============================
 // CALLBACK QUERY HANDLER
 // ===============================
 
@@ -827,212 +729,68 @@ bot.on('callback_query', async (query) => {
     try {
         if (!query.message || !query.message.chat) return;
 
-        const chatId = String(query.message.chat.id);
-        const userName = query.from.first_name || 'User';
+        const chatId = query.message.chat.id;
         const messageId = query.message.message_id;
         const data = query.data;
 
-        await bot.answerCallbackQuery(query.id).catch(() => {});
-
         // --- WITHDRAW CALLBACKS ---
         if (data.startsWith('wd_')) {
-            const methodCode = data.replace('wd_', '');
-            let methodName = '';
-            if (methodCode === 'bkash') methodName = 'Bkash 🔴';
-            if (methodCode === 'nagad') methodName = 'Nagad 🟠';
-            if (methodCode === 'rocket') methodName = 'Rocket 🟣';
+            if (data === 'wd_cancel') {
+                delete userState[chatId];
+                await bot.answerCallbackQuery(query.id, { text: 'Cancelled' });
+                return bot.editMessageText('❌ উইথড্র বাতিল করা হয়েছে।', { chat_id: chatId, message_id: messageId });
+            }
 
-            const userData = getUserData(chatId, userName);
-            const currentBalance = userData.totalEarned - userData.totalWithdrawn;
+            const methodMap = { 'wd_bkash': 'bKash', 'wd_nagad': 'Nagad', 'wd_rocket': 'Rocket' };
+            const selectedMethod = methodMap[data];
 
-            userState[chatId] = { step: 'waiting_for_withdraw_amount', method: methodName };
-            return bot.sendMessage(chatId, `💳 মাধ্যম: *${methodName}*\n\nবর্তমান ব্যালেন্স: *${currentBalance.toFixed(2)} ৳*\n\nকত টাকা উইথড্র করতে চান সেই পরিমাণ লিখে পাঠান (সর্বনিম্ন ${MIN_WITHDRAW_AMOUNT} ৳):`, { parse_mode: 'Markdown' });
+            userState[chatId] = { step: 'WAITING_FOR_WD_NUMBER', method: selectedMethod };
+            await bot.answerCallbackQuery(query.id);
+            return bot.editMessageText(
+                `💳 *Method:* ${selectedMethod}\n\nদয়া করে আপনার পেমেন্ট নম্বরটি (Personal Number) লিখে পাঠান:`,
+                { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' }
+            );
         }
 
         // --- ADMIN PANEL CALLBACKS ---
-        if (data === 'admin_add_app' && ADMIN_IDS.includes(chatId)) {
-            userState[chatId] = { step: 'waiting_for_new_app_name' };
-            return bot.sendMessage(chatId, `✍️ নতুন কাস্টম অ্যাপের নাম লিখে পাঠান:`, { parse_mode: 'Markdown' });
-        }
-
-        if (data === 'admin_manage_ranges' && ADMIN_IDS.includes(chatId)) {
-            const appNames = Object.keys(customAppsData);
-            if (appNames.length === 0) {
-                return bot.sendMessage(chatId, `⚠️ প্রথমে একটি অ্যাপ তৈরি করুন।`);
-            }
-            let buttons = [];
-            appNames.forEach(appName => {
-                buttons.push([{ text: `➕ Add Range to ${appName}`, callback_data: `admin_select_app_${appName}` }]);
-            });
-            buttons.push([{ text: '🔙 Back', callback_data: 'admin_back' }]);
-            return bot.editMessageText(`📂 যে অ্যাপে রেঞ্জ যোগ করতে চান তা সিলেক্ট করুন:`, {
-                chat_id: chatId,
-                message_id: messageId,
-                reply_markup: { inline_keyboard: buttons }
-            }).catch(() => {});
-        }
-
-        if (data.startsWith('admin_select_app_') && ADMIN_IDS.includes(chatId)) {
-            const appName = data.replace('admin_select_app_', '');
-            userState[chatId] = { step: 'waiting_for_range_input', appName: appName };
-            return bot.sendMessage(chatId, `✍️ **${appName}** এর জন্য নিচের ফরম্যাটে তথ্য পাঠান:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Togo, 🇹🇬, +38091XXX\``, { parse_mode: 'Markdown' });
-        }
-
-        if (data === 'admin_delete_menu' && ADMIN_IDS.includes(chatId)) {
-            const appNames = Object.keys(customAppsData);
-            if (appNames.length === 0) {
-                return bot.sendMessage(chatId, `⚠️ কোনো কাস্টম অ্যাপ নেই!`);
-            }
-            let buttons = [];
-            appNames.forEach(appName => {
-                buttons.push([
-                    { text: `❌ Delete App: ${appName}`, callback_data: `del_app_${appName}` },
-                    { text: `🗑️ Delete Range in ${appName}`, callback_data: `del_range_menu_${appName}` }
-                ]);
-            });
-            buttons.push([{ text: '🔙 Back', callback_data: 'admin_back' }]);
-            return bot.editMessageText(`🗑️ *DELETE MANAGER*`, {
-                chat_id: chatId,
-                message_id: messageId,
-                parse_mode: 'Markdown',
-                reply_markup: { inline_keyboard: buttons }
-            }).catch(() => {});
-        }
-
-        if (data.startsWith('del_app_') && ADMIN_IDS.includes(chatId)) {
-            const appName = data.replace('del_app_', '');
-            if (customAppsData[appName]) {
-                delete customAppsData[appName];
-            }
-            return bot.editMessageText(`✅ *${appName}* অ্যাপটি ডিলিট করা হয়েছে।`, {
-                chat_id: chatId,
-                message_id: messageId,
-                reply_markup: { inline_keyboard: [[{ text: '🔙 Back', callback_data: 'admin_delete_menu' }]] }
-            }).catch(() => {});
-        }
-
-        if (data.startsWith('del_range_menu_') && ADMIN_IDS.includes(chatId)) {
-            const appName = data.replace('del_range_menu_', '');
-            const appData = customAppsData[appName];
-
-            if (!appData || !appData.ranges || appData.ranges.length === 0) {
-                return bot.sendMessage(chatId, `⚠️ কোনো রেঞ্জ নেই!`);
+        if (chatId === ADMIN_ID) {
+            if (data === 'admin_add_app') {
+                userState[chatId] = { step: 'ADMIN_WAITING_APP_NAME' };
+                await bot.answerCallbackQuery(query.id);
+                return bot.sendMessage(chatId, `✍️ নতুন অ্যাপের নাম লিখে পাঠান (যেমন: Telegram, WhatsApp):`);
             }
 
-            let buttons = [];
-            appData.ranges.forEach((r, index) => {
-                buttons.push([{ text: `❌ ${r.flag} ${r.countryName} (${r.range})`, callback_data: `del_r_${appName}_${index}` }]);
-            });
-            buttons.push([{ text: '🔙 Back', callback_data: 'admin_delete_menu' }]);
-
-            return bot.editMessageText(`🗑️ *${appName}* এর রেঞ্জ সিলেক্ট করুন:`, {
-                chat_id: chatId,
-                message_id: messageId,
-                reply_markup: { inline_keyboard: buttons }
-            }).catch(() => {});
-        }
-
-        if (data.startsWith('del_r_') && ADMIN_IDS.includes(chatId)) {
-            const parts = data.replace('del_r_', '').split('_');
-            const appName = parts[0];
-            const rangeIndex = parseInt(parts[1]);
-
-            if (customAppsData[appName] && customAppsData[appName].ranges[rangeIndex]) {
-                customAppsData[appName].ranges.splice(rangeIndex, 1);
+            if (data === 'admin_add_range') {
+                userState[chatId] = { step: 'ADMIN_WAITING_RANGE_DETAILS' };
+                await bot.answerCallbackQuery(query.id);
+                return bot.sendMessage(chatId, `✍️ অ্যাপের নাম এবং রেঞ্জ এভাবে লিখে পাঠান:\n\`Appname:RangeID\`\nউদাহরণ: \`Telegram:12345\``, { parse_mode: 'Markdown' });
             }
 
-            return bot.editMessageText(`✅ রেঞ্জ সফলভাবে ডিলিট করা হয়েছে।`, {
-                chat_id: chatId,
-                message_id: messageId,
-                reply_markup: { inline_keyboard: [[{ text: '🔙 Back', callback_data: 'admin_delete_menu' }]] }
-            }).catch(() => {});
-        }
-
-        if (data === 'admin_view_custom' && ADMIN_IDS.includes(chatId)) {
-            const appNames = Object.keys(customAppsData);
-            if (appNames.length === 0) {
-                return bot.sendMessage(chatId, `⚠️ কোনো কাস্টম অ্যাপ নেই।`);
+            if (data === 'admin_delete_range') {
+                userState[chatId] = { step: 'ADMIN_WAITING_DELETE_RANGE' };
+                await bot.answerCallbackQuery(query.id);
+                return bot.sendMessage(chatId, `🗑️ যে অ্যাপের রেঞ্জ ডিলিট করতে চান তা এভাবে লিখুন:\n\`Appname:RangeID\`\nউদাহরণ: \`Telegram:12345\``, { parse_mode: 'Markdown' });
             }
-            let txt = `📋 *Your Custom Apps & Ranges:*\n\n`;
-            appNames.forEach(appName => {
-                txt += `🔹 *${appName}*:\n`;
-                if (customAppsData[appName].ranges.length === 0) {
-                    txt += `   (কোনো রেঞ্জ নেই)\n`;
-                } else {
-                    customAppsData[appName].ranges.forEach(r => {
-                        txt += `   - ${r.flag} ${r.countryName} (\`${r.range}\`)\n`;
-                    });
+
+            if (data === 'admin_view_list') {
+                await bot.answerCallbackQuery(query.id);
+                let listText = `📋 *Current Custom Apps & Ranges:*\n\n`;
+                for (const [app, ranges] of Object.entries(customApps)) {
+                    listText += `🔹 *${app}* -> [ ${ranges.join(', ')} ]\n`;
                 }
-            });
-            return bot.editMessageText(txt, {
-                chat_id: chatId,
-                message_id: messageId,
-                reply_markup: { inline_keyboard: [[{ text: '🔙 Back', callback_data: 'admin_back' }]] }
-            }).catch(() => {});
-        }
-
-        if (data === 'admin_back' && ADMIN_IDS.includes(chatId)) {
-            return sendAdminPanel(chatId, messageId);
+                if (Object.keys(customApps).length === 0) listText += `কোনো কাস্টম অ্যাপ যোগ করা হয়নি।`;
+                return bot.sendMessage(chatId, listText, { parse_nomd: 'Markdown' });
+            }
         }
 
         if (data === 'back_to_apps') {
-            delete userState[chatId];
+            await bot.answerCallbackQuery(query.id);
             return showAppsMenu(chatId, messageId);
-        }
-
-        if (data && data.startsWith('custom_app_')) {
-            const appName = data.replace('custom_app_', '');
-            return showCustomAppCountries(chatId, messageId, appName);
-        }
-
-        if (data && data.startsWith('fetch_custom_num_')) {
-            const parts = data.replace('fetch_custom_num_', '').split('_');
-            const appName = parts[0];
-            const rangeIndex = parseInt(parts[1]);
-
-            const item = customAppsData[appName] ? customAppsData[appName].ranges[rangeIndex] : null;
-
-            if (!item) {
-                return bot.answerCallbackQuery(query.id, { text: '⚠️ রেঞ্জ পাওয়া যায়নি!', show_alert: true }).catch(() => {});
-            }
-
-            await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId }).catch(() => {});
-
-            const actualNumResult = await getNewNumber(item.range).catch(() => null);
-            
-            if (!actualNumResult || !actualNumResult.data) {
-                return bot.editMessageText('❌ Failed to allocate number from panel. Try another range.', { chat_id: chatId, message_id: messageId }).catch(() => {});
-            }
-
-            const phoneData = actualNumResult.data;
-            const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
-
-            startFastOtpChecker(chatId, phoneNumber, userName);
-
-            const numberKeyboard = {
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            { text: '🔄 Change Number', callback_data: `fetch_custom_num_${appName}_${rangeIndex}` },
-                            { text: '⬅️ Back to Countries', callback_data: `custom_app_${appName}` }
-                        ]
-                    ]
-                }
-            };
-
-            return bot.editMessageText(
-                `⚡ *━━━ RIFAT OTP SERVICE ━━━* ⚡\n\n` +
-                `🎯 *Service:* \`${appName}\`\n` +
-                `${item.flag} *Country:* \`${item.countryName}\`\n` +
-                `📞 *Number:* \`${phoneNumber}\`\n\n` +
-                `✅ *Status:* Active Number Allocated\n` +
-                `⏰ *Validity:* 15 Minutes`,
-                { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', ...numberKeyboard }
-            ).catch(() => {});
         }
 
         if (data && data.startsWith('app_')) {
             const appName = data.replace('app_', '');
+            await bot.answerCallbackQuery(query.id);
             return showCountriesForApp(chatId, messageId, appName);
         }
 
@@ -1041,12 +799,13 @@ bot.on('callback_query', async (query) => {
             const targetRange = parts[1];
             const appName = decodeURIComponent(parts[2] || 'Service');
 
-            await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId }).catch(() => {});
+            await bot.answerCallbackQuery(query.id, { text: 'Allocating number...' });
+            await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId });
 
-            const actualNumResult = await getNewNumber(targetRange).catch(() => null);
+            const actualNumResult = await getNewNumber(targetRange);
             
             if (!actualNumResult || !actualNumResult.data) {
-                return bot.editMessageText('❌ Failed to allocate number from panel. Try another range.', { chat_id: chatId, message_id: messageId }).catch(() => {});
+                return bot.editMessageText('❌ Failed to allocate number from panel. Try another range.', { chat_id: chatId, message_id: messageId });
             }
 
             const phoneData = actualNumResult.data;
@@ -1054,7 +813,7 @@ bot.on('callback_query', async (query) => {
             const finalCountry = phoneData.country || phoneData.country_name || 'Global';
             const flagEmoji = getCountryFlag(finalCountry);
 
-            startFastOtpChecker(chatId, phoneNumber, userName);
+            startFastOtpChecker(chatId, phoneNumber);
 
             const numberKeyboard = {
                 reply_markup: {
@@ -1069,13 +828,14 @@ bot.on('callback_query', async (query) => {
 
             return bot.editMessageText(
                 `⚡ *━━━ RIFAT OTP SERVICE ━━━* ⚡\n\n` +
+                `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
                 `🎯 *Service:* \`${appName}\`\n` +
                 `${flagEmoji} *Country:* \`${finalCountry}\`\n` +
                 `📞 *Number:* \`${phoneNumber}\`\n\n` +
                 `✅ *Status:* Active Number Allocated\n` +
                 `⏰ *Validity:* 15 Minutes`,
                 { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', ...numberKeyboard }
-            ).catch(() => {});
+            );
         }
     } catch (error) {
         console.error('Callback Error:', error.message);
