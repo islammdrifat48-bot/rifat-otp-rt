@@ -68,9 +68,6 @@ const processedOtps = new Set();
 const MIN_WITHDRAW_AMOUNT = 100.00;
 const OTP_REWARD_AMOUNT = 0.70;
 
-// পাবলিক ইউ আইডি (UID) কনফিগারেশন
-const PUBLIC_UID = 'MQUPBWI9AQJ';
-
 // আপনার টেলিগ্রাম অ্যাডমিন আইডি
 const ADMIN_ID = 6315111273;
 
@@ -231,7 +228,6 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
         await bot.sendMessage(
             chatId,
             `👋 *RIFAT_SMS* Bot service is active!\n\n` +
-            `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
             `💡 *Per OTP Reward:* ${OTP_REWARD_AMOUNT} ৳\n` +
             `⏱️ *Time Limit:* OTP must arrive within 15 minutes.\n\n` +
             `📢 *Official Channels:*\n` +
@@ -262,7 +258,6 @@ async function sendBalance(chatId) {
 
     const balanceMsg =
         `📊 *Your Account Statement:*\n\n` +
-        `🆔 *Public UID:* \`${PUBLIC_UID}\`\n` +
         `🔢 *Total Received OTP:* \`${data.totalOtp}\`\n` +
         `💵 *Total Earnings:* \`${data.totalEarned.toFixed(2)}\` ৳\n` +
         `🏧 *Total Withdrawal:* \`${data.totalWithdrawn.toFixed(2)}\` ৳\n` +
@@ -341,7 +336,6 @@ async function startFastOtpChecker(chatId, phoneNumber) {
 
                         const otpMsg =
                             `🎉 *OTP Received Successfully!*\n\n` +
-                            `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
                             `📞 *Number:* \`${maskedNumber}\`\n` +
                             `💬 *Details:* \`${messageText}\`\n` +
                             `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
@@ -463,7 +457,7 @@ async function showAppsMenu(chatId, messageId = null) {
             inlineKeyboard.push(row);
         }
 
-        const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n🆔 *UID:* \`${PUBLIC_UID}\`\n\n👇 Select your desired app/service below:`;
+        const menuText = `🎛️ *RIFAT OTP DASHBOARD*\n\n👇 Select your desired app/service below:`;
         const reply_markup = { inline_keyboard: inlineKeyboard };
 
         if (messageId) {
@@ -638,10 +632,67 @@ bot.on('message', async (msg) => {
         }
     }
 
+    // উইথড্র প্রসেসিং (বিকাশ, নগদ, রকেট অ্যাকাউন্ট নাম্বার ইনপুট নেওয়া)
+    if (userState[chatId] && userState[chatId].step === 'waiting_for_withdraw_number') {
+        const method = userState[chatId].method;
+        const targetNumber = text;
+        delete userState[chatId];
+
+        const userData = getUserData(chatId);
+        const currentBalance = userData.totalEarned - userData.totalWithdrawn;
+
+        if (currentBalance < MIN_WITHDRAW_AMOUNT) {
+            return bot.sendMessage(chatId, `❌ আপনার পর্যাপ্ত ব্যালেন্স নেই। ন্যূনতম উইথড্র ${MIN_WITHDRAW_AMOUNT} ৳।`, { ...getMainMenuMarkup(chatId) });
+        }
+
+        // ইউজারের ব্যালেন্স থেকে কেটে নেওয়া বা উইথড্র এপ্রুভ করার রিকোয়েস্ট অ্যাডমিনের কাছে পাঠানো
+        userData.totalWithdrawn += currentBalance; // উইথড্র সফল ধরে ব্যালেন্স কেটে নেওয়া হলো
+
+        const withdrawSlip = 
+            `💸 *New Withdrawal Request!*\n\n` +
+            `👤 *User ID:* \`${chatId}\`\n` +
+            `💳 *Method:* \`${method}\`\n` +
+            `📞 *Account Number:* \`${targetNumber}\`\n` +
+            `💰 *Amount:* \`${currentBalance.toFixed(2)}\` ৳\n\n` +
+            `✅ Status: Payment Success Sent to Admin!`;
+
+        // ইউজারকে মেসেজ পাঠানো
+        await bot.sendMessage(chatId, `✅ আপনার উইথড্র সফল হয়েছে! পেমেন্ট রিকোয়েস্ট অ্যাডমিনের কাছে পাঠানো হয়েছে।\n\n💳 পদ্ধতি: *${method}*\n📞 নম্বর: \`${targetNumber}\`\n💰 পরিমাণ: *${currentBalance.toFixed(2)} ৳*`, { parse_mode: 'Markdown', ...getMainMenuMarkup(chatId) });
+
+        // অ্যাডমিনকে নোটিফিকেশন পাঠানো
+        await bot.sendMessage(ADMIN_ID, withdrawSlip, { parse_mode: 'Markdown' });
+        return;
+    }
+
     if (userLocks[chatId]) return;
 
     if (text.includes('BALANCE') || text.toLowerCase() === 'stat') {
         return sendBalance(chatId);
+    }
+
+    if (text.includes('WITHDRAW')) {
+        const userData = getUserData(chatId);
+        const currentBalance = userData.totalEarned - userData.totalWithdrawn;
+
+        if (currentBalance < MIN_WITHDRAW_AMOUNT) {
+            return bot.sendMessage(chatId, `❌ আপনার একাউন্টে পর্যাপ্ত ব্যালেন্স নেই!\nন্যূনতম উইথড্র করতে হবে: *${MIN_WITHDRAW_AMOUNT} ৳*\nআপনার বর্তমান ব্যালেন্স: *${currentBalance.toFixed(2)} ৳*`, { parse_mode: 'Markdown', ...getMainMenuMarkup(chatId) });
+        }
+
+        const withdrawKeyboard = {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: '🔴 বিকাশ (Bkash)', callback_data: 'wd_bkash' },
+                        { text: '🟠 নগদ (Nagad)', callback_data: 'wd_nagad' }
+                    ],
+                    [
+                        { text: '🟣 রকেট (Rocket)', callback_data: 'wd_rocket' }
+                    ]
+                ]
+            }
+        };
+
+        return bot.sendMessage(chatId, `🏧 *WITHDRAW SYSTEM*\n\nআপনার বর্তমান ব্যালেন্স: *${currentBalance.toFixed(2)} ৳*\n\nদয়া করে নিচের অপশন থেকে আপনার পেমেন্ট মাধ্যমটি সিলেক্ট করুন:`, { parse_mode: 'Markdown', ...withdrawKeyboard });
     }
 
     if (text.includes('SUPPORT')) {
@@ -676,6 +727,19 @@ bot.on('callback_query', async (query) => {
         if (data === 'back_to_apps') {
             await bot.answerCallbackQuery(query.id);
             return showAppsMenu(chatId, messageId);
+        }
+
+        // উইথড্র মাধ্যম সিলেকশন হ্যান্ডলার
+        if (data.startsWith('wd_')) {
+            const methodCode = data.replace('wd_', '');
+            let methodName = '';
+            if (methodCode === 'bkash') methodName = 'Bkash 🔴';
+            if (methodCode === 'nagad') methodName = 'Nagad 🟠';
+            if (methodCode === 'rocket') methodName = 'Rocket 🟣';
+
+            userState[chatId] = { step: 'waiting_for_withdraw_number', method: methodName };
+            await bot.answerCallbackQuery(query.id);
+            return bot.sendMessage(chatId, `💳 আপনি সিলেক্ট করেছেন: *${methodName}*\n\nদয়া করে আপনার ব্যক্তিগত **${methodName}** অ্যাকাউন্ট নম্বরটি লিখে পাঠান:`, { parse_mode: 'Markdown' });
         }
 
         if (data === 'admin_add_app' && chatId === ADMIN_ID) {
@@ -742,6 +806,7 @@ bot.on('callback_query', async (query) => {
             return showCustomAppCountries(chatId, messageId, appName);
         }
 
+        // কাস্টম অ্যাপ থেকে একসাথে ৫টি নাম্বার ফেচ করা
         if (data.startsWith('fetch_custom_num_')) {
             const parts = data.replace('fetch_custom_num_', '').split('_');
             const appName = parts[0];
@@ -754,27 +819,41 @@ bot.on('callback_query', async (query) => {
                 return bot.answerCallbackQuery(query.id, { text: '⚠️ রেঞ্জ পাওয়া যায়নি!', show_alert: true });
             }
 
-            await bot.answerCallbackQuery(query.id, { text: `${item.countryName} থেকে নাম্বার ফেচ হচ্ছে...` });
-            await bot.editMessageText('⏳ Allocating fresh number from panel based on range...', { chat_id: chatId, message_id: messageId });
+            await bot.answerCallbackQuery(query.id, { text: `${item.countryName} থেকে ৫টি নাম্বার ফেচ হচ্ছে...` });
+            await bot.editMessageText('⏳ Allocating 5 fresh numbers from panel based on range...', { chat_id: chatId, message_id: messageId });
 
-            const actualNumResult = await getNewNumber(item.range);
+            let numbersListText = '';
+            let validNumbersCount = 0;
 
-            if (!actualNumResult || !actualNumResult.data) {
-                return bot.editMessageText('❌ Failed to allocate number from panel. Try again later.', { chat_id: chatId, message_id: messageId });
+            for (let i = 0; i < 5; i++) {
+                try {
+                    const actualNumResult = await getNewNumber(item.range);
+                    if (actualNumResult && actualNumResult.data) {
+                        const phoneData = actualNumResult.data;
+                        const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
+                        validNumbersCount++;
+                        numbersListText += `${validNumbersCount}. \`${phoneNumber}\`\n`;
+                        
+                        // প্রতিটি নাম্বারের জন্য আলাদাভাবে ওটিপি চেকার চালু করা হলো
+                        startFastOtpChecker(chatId, phoneNumber);
+                    }
+                } catch (err) {
+                    console.error('Error fetching one of 5 numbers:', err.message);
+                }
             }
 
-            const phoneData = actualNumResult.data;
-            const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
+            if (validNumbersCount === 0) {
+                return bot.editMessageText('❌ Failed to allocate numbers from panel. Try again later.', { chat_id: chatId, message_id: messageId });
+            }
+
             const finalCountry = item.countryName;
             const flagEmoji = item.flag;
-
-            startFastOtpChecker(chatId, phoneNumber);
 
             const numberKeyboard = {
                 reply_markup: {
                     inline_keyboard: [
                         [
-                            { text: '🔄 Change Number', callback_data: `fetch_custom_num_${appName}_${rangeIndex}` },
+                            { text: '🔄 Change Numbers (5x)', callback_data: `fetch_custom_num_${appName}_${rangeIndex}` },
                             { text: '⬅️ Back to Countries', callback_data: `custom_app_${appName}` }
                         ]
                     ]
@@ -782,12 +861,11 @@ bot.on('callback_query', async (query) => {
             };
 
             return bot.editMessageText(
-                `⚡ *━━━ RIFAT OTP SERVICE ━━━* ⚡\n\n` +
-                `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
+                `⚡ *━━━ RIFAT OTP SERVICE (5 NUMBERS) ━━━* ⚡\n\n` +
                 `🎯 *Service:* \`${appName}\`\n` +
-                `${flagEmoji} *Country:* \`${finalCountry}\`\n` +
-                `📞 *Number:* \`${phoneNumber}\`\n\n` +
-                `✅ *Status:* Active Number Allocated\n` +
+                `${flagEmoji} *Country:* \`${finalCountry}\`\n\n` +
+                `📞 *Allocated Numbers:*\n${numbersListText}\n` +
+                `✅ *Status:* Active Numbers Allocated\n` +
                 `⏰ *Validity:* 15 Minutes`,
                 { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', ...numberKeyboard }
             );
@@ -799,32 +877,48 @@ bot.on('callback_query', async (query) => {
             return showCountriesForApp(chatId, messageId, appName);
         }
 
+        // লাইভ প্যানেল অ্যাপ থেকে একসাথে ৫টি নাম্বার ফেচ করা
         if (data && data.startsWith('num_')) {
             const parts = data.split('_');
             const targetRange = parts[1];
             const appName = decodeURIComponent(parts[2] || 'Service');
 
-            await bot.answerCallbackQuery(query.id, { text: 'Allocating number...' });
-            await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId });
+            await bot.answerCallbackQuery(query.id, { text: 'Allocating 5 numbers...' });
+            await bot.editMessageText('⏳ Allocating 5 fresh numbers from panel...', { chat_id: chatId, message_id: messageId });
 
-            const actualNumResult = await getNewNumber(targetRange);
-            
-            if (!actualNumResult || !actualNumResult.data) {
-                return bot.editMessageText('❌ Failed to allocate number from panel. Try another range.', { chat_id: chatId, message_id: messageId });
+            let numbersListText = '';
+            let validNumbersCount = 0;
+            let finalCountry = 'Global';
+
+            for (let i = 0; i < 5; i++) {
+                try {
+                    const actualNumResult = await getNewNumber(targetRange);
+                    if (actualNumResult && actualNumResult.data) {
+                        const phoneData = actualNumResult.data;
+                        const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
+                        finalCountry = phoneData.country || phoneData.country_name || finalCountry;
+                        validNumbersCount++;
+                        numbersListText += `${validNumbersCount}. \`${phoneNumber}\`\n`;
+
+                        // প্রতিটি নাম্বারের জন্য ওটিপি চেকার চালু করা
+                        startFastOtpChecker(chatId, phoneNumber);
+                    }
+                } catch (err) {
+                    console.error('Error fetching one of 5 live numbers:', err.message);
+                }
             }
 
-            const phoneData = actualNumResult.data;
-            const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
-            const finalCountry = phoneData.country || phoneData.country_name || 'Global';
-            const flagEmoji = getCountryFlag(finalCountry);
+            if (validNumbersCount === 0) {
+                return bot.editMessageText('❌ Failed to allocate numbers from panel. Try another range.', { chat_id: chatId, message_id: messageId });
+            }
 
-            startFastOtpChecker(chatId, phoneNumber);
+            const flagEmoji = getCountryFlag(finalCountry);
 
             const numberKeyboard = {
                 reply_markup: {
                     inline_keyboard: [
                         [
-                            { text: '🔄 Change Number', callback_data: `num_${targetRange}_${encodeURIComponent(appName)}` },
+                            { text: '🔄 Change Numbers (5x)', callback_data: `num_${targetRange}_${encodeURIComponent(appName)}` },
                             { text: '⬅️ Back to Countries', callback_data: `app_${appName}` }
                         ]
                     ]
@@ -832,12 +926,11 @@ bot.on('callback_query', async (query) => {
             };
 
             return bot.editMessageText(
-                `⚡ *━━━ RIFAT OTP SERVICE ━━━* ⚡\n\n` +
-                `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
+                `⚡ *━━━ RIFAT OTP SERVICE (5 NUMBERS) ━━━* ⚡\n\n` +
                 `🎯 *Service:* \`${appName}\`\n` +
-                `${flagEmoji} *Country:* \`${finalCountry}\`\n` +
-                `📞 *Number:* \`${phoneNumber}\`\n\n` +
-                `✅ *Status:* Active Number Allocated\n` +
+                `${flagEmoji} *Country:* \`${finalCountry}\`\n\n` +
+                `📞 *Allocated Numbers:*\n${numbersListText}\n` +
+                `✅ *Status:* Active Numbers Allocated\n` +
                 `⏰ *Validity:* 15 Minutes`,
                 { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', ...numberKeyboard }
             );
