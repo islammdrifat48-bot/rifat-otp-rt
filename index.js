@@ -67,13 +67,13 @@ const processedOtps = new Set();
 const MIN_WITHDRAW_AMOUNT = 300.00;
 const OTP_REWARD_AMOUNT = 0.70;
 
-// পাবলিক ইউ আইডি (UID) কনফিগারেশন - নিশ্চিত করা হলো
+// পাবলিক ইউ আইডি (UID) কনফিগারেশন
 const PUBLIC_UID = 'MQUPBWI9AQJ';
 
 // আপনার টেলিগ্রাম অ্যাডমিন আইডি
 const ADMIN_ID = 6315111273;
 
-// ফাইল নেম কনফিগারেশন (সার্ভার ক্লিয়ার হলেও ডেটা মুছে যাবে না)
+// ফাইল নেম কনফিগারেশন
 const CUSTOM_APPS_FILE = 'custom_apps.json';
 const USERS_DATA_FILE = 'users_data.json';
 
@@ -216,7 +216,7 @@ async function checkChannelMember(userId) {
 
 
 // ===============================
-// MAIN MENU (Dynamic Keyboard for Admin & Users)
+// MAIN MENU
 // ===============================
 
 function getMainMenuMarkup(userId) {
@@ -314,13 +314,13 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE SUCCESS OTP CHECKER (UPDATED & 100% SECURE)
+// BULLET-PROOF SECURE SUCCESS OTP CHECKER
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
     const startTime = Date.now();
-    const maxDurationMs = 15 * 60 * 1000;
-    const intervalTime = 2000; // প্রতি ২ সেকেন্ড পর পর চেক করবে
+    const maxDurationMs = 15 * 60 * 1000; // ১৫ মিনিট
+    const intervalTime = 2000; // প্রতি ২ সেকেন্ড পর পর চেক
 
     const cleanUserPhone = String(phoneNumber).replace(/\D/g, '');
 
@@ -333,7 +333,6 @@ async function startFastOtpChecker(chatId, phoneNumber) {
         }
 
         try {
-            // পাবলিক UID সহ ওটিপি ফেচ করার রিকোয়েস্ট পাঠানো হচ্ছে
             const otpResult = await getSuccessOtp(PUBLIC_UID);
             if (otpResult && otpResult.data) {
                 const otpsList = otpResult.data.otps || otpResult.data.data || otpResult.data;
@@ -585,7 +584,7 @@ async function showCustomAppCountries(chatId, messageId, appName) {
     const appData = data[appName];
 
     if (!appData || !appData.ranges || appData.ranges.length === 0) {
-        return bot.answerCbQuery ? bot.answerCbQuery({ text: '⚠️ এই অ্যাপে কোনো কান্ট্রি রেঞ্জ নেই!', show_alert: true }) : null;
+        return bot.answerCbQuery ? bot.answerCbQuery(query.id, { text: '⚠️ এই অ্যাপে কোনো কান্ট্রি রেঞ্জ নেই!', show_alert: true }) : null;
     }
 
     let buttons = [];
@@ -973,7 +972,6 @@ bot.on('callback_query', async (query) => {
 
             for (let i = 0; i < 5; i++) {
                 try {
-                    // UID সহ নাম্বার নেওয়ার রিকোয়েস্ট পাঠানো হচ্ছে
                     const actualNumResult = await getNewNumber(PUBLIC_UID, item.range);
                     if (actualNumResult && actualNumResult.data) {
                         const phoneData = actualNumResult.data;
@@ -1035,7 +1033,6 @@ bot.on('callback_query', async (query) => {
 
             for (let i = 0; i < 5; i++) {
                 try {
-                    // UID সহ লাইভ নাম্বার নেওয়ার রিকোয়েস্ট পাঠানো হচ্ছে
                     const actualNumResult = await getNewNumber(PUBLIC_UID, targetRange);
                     if (actualNumResult && actualNumResult.data) {
                         const phoneData = actualNumResult.data;
