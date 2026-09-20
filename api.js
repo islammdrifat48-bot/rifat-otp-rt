@@ -6,11 +6,10 @@ const getHeaders = () => ({
     'Content-Type': 'application/json'
 });
 
-async function getLiveAccess(uid) {
+async function getLiveAccess() {
     try {
         const response = await axiosInstance.get(`${config.BASE_URL}/liveaccess`, {
-            headers: getHeaders(),
-            params: { uid: uid }
+            headers: getHeaders()
         });
         return response.data;
     } catch (error) {
@@ -19,14 +18,11 @@ async function getLiveAccess(uid) {
     }
 }
 
-async function getNewNumber(uid, rangeId) {
+async function getNewNumber(rangeId) {
     try {
         const payload = {};
         if (rangeId) {
             payload.rid = rangeId;
-        }
-        if (uid) {
-            payload.uid = uid;
         }
 
         const response = await axiosInstance.post(`${config.BASE_URL}/getnum`, payload, {
@@ -44,11 +40,10 @@ async function getNewNumber(uid, rangeId) {
     }
 }
 
-async function getSuccessOtp(uid) {
+async function getSuccessOtp() {
     try {
         const response = await axiosInstance.get(`${config.BASE_URL}/success-otp`, {
-            headers: getHeaders(),
-            params: { uid: uid }
+            headers: getHeaders()
         });
         return response.data;
     } catch (error) {
