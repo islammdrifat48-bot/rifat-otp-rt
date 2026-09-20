@@ -56,7 +56,7 @@ bot.getMe()
 
 
 // ===============================
-// EXACT getNewNumber FUNCTION FIX
+// EXACT getNewNumber FUNCTION
 // ===============================
 async function getNewNumber(rangeId) {
     try {
@@ -83,6 +83,7 @@ async function getNewNumber(rangeId) {
         } else {
             console.error('API getNewNumber error:', error.message);
         }
+
         return null;
     }
 }
@@ -440,7 +441,7 @@ async function startFastOtpChecker(chatId, phoneNumber, userName = 'User') {
 
 
 // ===============================
-// STEP 1: APPS MENU BUILDER
+// STEP 1: APPS MENU BUILDER (SAFE FALLBACK)
 // ===============================
 async function showAppsMenu(chatId, messageId = null) {
     try {
@@ -456,19 +457,6 @@ async function showAppsMenu(chatId, messageId = null) {
             return;
         }
 
-        const liveData = await getLiveAccess();
-        const rawServices = liveData?.data?.services || liveData?.data || [];
-        const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
-
-        const apiAppsSet = new Set();
-        items.forEach(service => {
-            if (!service) return;
-            const sName = service.sid || service.name || service.title || service.service || service.app_name;
-            if (sName) {
-                apiAppsSet.add(String(sName).trim());
-            }
-        });
-
         const inlineKeyboard = [];
         let row = [];
 
@@ -481,7 +469,7 @@ async function showAppsMenu(chatId, messageId = null) {
             'discord': '🎮'
         };
 
-        // ১. কাস্টম অ্যাপস সবার উপরে
+        // ১. কাস্টম অ্যাপস সবার উপরে দেখাবে (এপিআই ফেইল করলেও এটা ওপেন হবে)
         Object.keys(customAppsData).forEach(appName => {
             const cleanName = String(appName).trim();
             const icon = appIcons[cleanName.toLowerCase()] || '🚀';
@@ -497,23 +485,35 @@ async function showAppsMenu(chatId, messageId = null) {
             }
         });
 
-        // ২. এপিআই অ্যাপস এর নিচে
-        apiAppsSet.forEach(appName => {
-            const cleanName = String(appName).trim();
-            if (!customAppsData[cleanName]) {
-                const icon = appIcons[cleanName.toLowerCase()] || '📱';
+        // ২. লাইভ এপিআই থেকে সার্ভিস লোড করার চেষ্টা (ফেইল করলে ক্র্যাশ করবে না)
+        try {
+            const liveData = await getLiveAccess();
+            const rawServices = liveData?.data?.services || liveData?.data || [];
+            const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
 
-                row.push({
-                    text: `${icon}${cleanName}`,
-                    callback_data: `app_${cleanName}`
-                });
+            items.forEach(service => {
+                if (!service) return;
+                const sName = service.sid || service.name || service.title || service.service || service.app_name;
+                if (sName) {
+                    const cleanName = String(sName).trim();
+                    if (!customAppsData[cleanName]) {
+                        const icon = appIcons[cleanName.toLowerCase()] || '📱';
 
-                if (row.length === 2) {
-                    inlineKeyboard.push(row);
-                    row = [];
+                        row.push({
+                            text: `${icon}${cleanName}`,
+                            callback_data: `app_${cleanName}`
+                        });
+
+                        if (row.length === 2) {
+                            inlineKeyboard.push(row);
+                            row = [];
+                        }
+                    }
                 }
-            }
-        });
+            });
+        } catch (apiErr) {
+            console.log('Live access API offline, showing custom apps only.');
+        }
 
         if (row.length > 0) {
             inlineKeyboard.push(row);
@@ -686,7 +686,7 @@ bot.on('message', async (msg) => {
                 delete userState[chatId];
                 return bot.sendMessage(chatId, `✅ সফলভাবে রেঞ্জ যোগ করা হয়েছে!\n\nApp: *${appName}*\nCountry: ${flag} *${countryName}*\nRange: \`${range}\``, { parse_mode: 'Markdown' });
             } else {
-                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে দিন:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`togo, 🇹🇬, +22891xxx\``, { parse_mode: 'Markdown' });
+                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে দিন:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Togo, 🇹🇬, +38091XXX\``, { parse_mode: 'Markdown' });
             }
         }
     }
@@ -858,7 +858,7 @@ bot.on('callback_query', async (query) => {
         if (data.startsWith('admin_select_app_') && ADMIN_IDS.includes(chatId)) {
             const appName = data.replace('admin_select_app_', '');
             userState[chatId] = { step: 'waiting_for_range_input', appName: appName };
-            return bot.sendMessage(chatId, `✍️ **${appName}** এর জন্য নিচের ফরম্যাটে তথ্য পাঠান:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`togo, 🇹🇬, +22891xxx\``, { parse_mode: 'Markdown' });
+            return bot.sendMessage(chatId, `✍️ **${appName}** এর জন্য নিচের ফরম্যাটে তথ্য পাঠান:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Togo, 🇹🇬, +38091XXX\``, { parse_mode: 'Markdown' });
         }
 
         if (data === 'admin_delete_menu' && ADMIN_IDS.includes(chatId)) {
@@ -981,7 +981,6 @@ bot.on('callback_query', async (query) => {
 
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId }).catch(() => {});
 
-            // আপনার দেওয়া সঠিক getNewNumber ফাংশন এখানে কল করা হচ্ছে
             const actualNumResult = await getNewNumber(item.range).catch(() => null);
             
             if (!actualNumResult || !actualNumResult.data) {
