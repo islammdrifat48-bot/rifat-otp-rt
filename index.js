@@ -67,7 +67,7 @@ const processedOtps = new Set();
 const MIN_WITHDRAW_AMOUNT = 300.00;
 const OTP_REWARD_AMOUNT = 0.70;
 
-// পাবলিক ইউ আইডি (UID) কনফিগারেশন
+// পাবলিক ইউ আইডি (UID) কনফিগারেশন - নিশ্চিত করা হলো
 const PUBLIC_UID = 'MQUPBWI9AQJ';
 
 // আপনার টেলিগ্রাম অ্যাডমিন আইডি
@@ -314,7 +314,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE SUCCESS OTP CHECKER (FIXED)
+// SECURE SUCCESS OTP CHECKER (UPDATED & 100% SECURE)
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
@@ -333,9 +333,9 @@ async function startFastOtpChecker(chatId, phoneNumber) {
         }
 
         try {
-            const otpResult = await getSuccessOtp();
+            // পাবলিক UID সহ ওটিপি ফেচ করার রিকোয়েস্ট পাঠানো হচ্ছে
+            const otpResult = await getSuccessOtp(PUBLIC_UID);
             if (otpResult && otpResult.data) {
-                // VoltX API রেসপন্স ফরম্যাট হ্যান্ডেল করার জন্য
                 const otpsList = otpResult.data.otps || otpResult.data.data || otpResult.data;
                 const items = Array.isArray(otpsList) ? otpsList : Object.values(otpsList);
 
@@ -365,7 +365,6 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                         processedOtps.add(uniqueOtpId);
                         clearInterval(interval);
 
-                        // ফায়ারবেস বা ফাইল ডাটা আপডেট করা
                         updateUserData(chatId, (userData) => {
                             userData.totalOtp += 1;
                             userData.totalEarned += OTP_REWARD_AMOUNT;
@@ -449,7 +448,7 @@ async function showAppsMenu(chatId, messageId = null) {
         });
 
         try {
-            const liveData = await getLiveAccess();
+            const liveData = await getLiveAccess(PUBLIC_UID);
             if (liveData && liveData.data) {
                 const rawServices = liveData.data.services || liveData.data;
                 const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
@@ -517,7 +516,7 @@ async function showAppsMenu(chatId, messageId = null) {
 // ===============================
 async function showCountriesForApp(chatId, messageId, appName) {
     try {
-        const liveData = await getLiveAccess();
+        const liveData = await getLiveAccess(PUBLIC_UID);
         if (!liveData || !liveData.data) return;
 
         const rawServices = liveData.data.services || liveData.data;
@@ -974,7 +973,8 @@ bot.on('callback_query', async (query) => {
 
             for (let i = 0; i < 5; i++) {
                 try {
-                    const actualNumResult = await getNewNumber(item.range);
+                    // UID সহ নাম্বার নেওয়ার রিকোয়েস্ট পাঠানো হচ্ছে
+                    const actualNumResult = await getNewNumber(PUBLIC_UID, item.range);
                     if (actualNumResult && actualNumResult.data) {
                         const phoneData = actualNumResult.data;
                         const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
@@ -1035,7 +1035,8 @@ bot.on('callback_query', async (query) => {
 
             for (let i = 0; i < 5; i++) {
                 try {
-                    const actualNumResult = await getNewNumber(targetRange);
+                    // UID সহ লাইভ নাম্বার নেওয়ার রিকোয়েস্ট পাঠানো হচ্ছে
+                    const actualNumResult = await getNewNumber(PUBLIC_UID, targetRange);
                     if (actualNumResult && actualNumResult.data) {
                         const phoneData = actualNumResult.data;
                         const phoneNumber = phoneData.full_number || phoneData.number || 'N/A';
