@@ -949,10 +949,8 @@ bot.on('callback_query', async (query) => {
 
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId }).catch(() => {});
 
-            // এখান থেকে রেঞ্জের ভেতরের শুধু সংখ্যাগুলো (যেমন: 22891xxx থেকে সংখ্যা) বা এপিআইয়ের জন্য সঠিক ফরম্যাট তৈরি করা হচ্ছে
-            const cleanRange = String(item.range).replace(/[^0-9]/g, '');
-
-            const actualNumResult = await getNewNumber(PUBLIC_UID, cleanRange).catch(() => null);
+            // একদম নিখুঁতভাবে আসল রেঞ্জ পাস করার লজিক
+            const actualNumResult = await getNewNumber(PUBLIC_UID, item.range).catch(() => null);
             
             if (!actualNumResult || !actualNumResult.data) {
                 return bot.editMessageText('❌ Failed to allocate number from panel. Try another range.', { chat_id: chatId, message_id: messageId }).catch(() => {});
