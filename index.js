@@ -66,26 +66,25 @@ const processedOtps = new Set();
 const MIN_WITHDRAW_AMOUNT = 500.00; // সর্বনিম্ন উইথড্র ৫০০ টাকা
 const OTP_REWARD_AMOUNT = 0.70;
 
-// পাবলিক ইউআইডি (UID) - ব্যাকএন্ড এপিআই কলের জন্য ইন্টারনালি ব্যবহার করা হবে কিন্তু মেসেজে দেখাবে না
 const PUBLIC_UID = 'MQUPBWI9AQJ';
-
-// মেথড গ্রুপের ইউজারনেম
 const METHOD_CHANNEL = '@otpmethod_r';
-
-// আপনার অ্যাডমিন আইডি
 const ADMIN_IDS = ['6315111273'];
 
-// কাস্টম অ্যাপ ও রেঞ্জ স্টোরেজ
 let customAdminApps = [];
 
 
-function getUserData(userId) {
+function getUserData(userId, userName = 'User') {
     if (!userBalance[userId]) {
         userBalance[userId] = {
+            name: userName,
             totalOtp: 0,
             totalEarned: 0,
             totalWithdrawn: 0
         };
+    } else {
+        if (userName && userName !== 'User') {
+            userBalance[userId].name = userName;
+        }
     }
     return userBalance[userId];
 }
@@ -196,8 +195,9 @@ const mainMenu = {
 
 bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
     const chatId = msg.chat.id;
+    const userName = msg.from.first_name || 'User';
     delete userState[chatId];
-    getUserData(chatId);
+    getUserData(chatId, userName);
 
     try {
         await bot.sendMessage(
@@ -244,9 +244,9 @@ bot.onText(/^\/admin(?:@\w+)?$/, async (msg) => {
 // BALANCE FUNCTION
 // ===============================
 
-async function sendBalance(chatId) {
+async function sendBalance(chatId, userName = 'User') {
     delete userState[chatId];
-    const data = getUserData(chatId);
+    const data = getUserData(chatId, userName);
     const currentBalance = data.totalEarned - data.totalWithdrawn;
 
     const balanceMsg =
@@ -270,10 +270,46 @@ async function sendBalance(chatId) {
 
 
 // ===============================
+// LEADERBOARD FUNCTION
+// ===============================
+
+async function sendLeaderboard(chatId) {
+    try {
+        const usersArray = Object.values(userBalance);
+        
+        // যাদের ওটিপি ০ এর বেশি শুধু তাদের ফিল্টার করে সাজানো এবং সর্বোচ্চ ১০ জন দেখানো
+        usersArray.sort((a, b) => b.totalOtp - a.totalOtp);
+        const topUsers = usersArray.filter(u => u.totalOtp > 0).slice(0, 10);
+
+        let lbText = `🏆 *TOP OTP EARNERS LEADERBOARD* 🏆\n\n`;
+
+        if (topUsers.length === 0) {
+            lbText += `📭 এখনও কেউ সফলভাবে কোনো ওটিপি রিসিভ করেনি!`;
+        } else {
+            topUsers.forEach((user, index) => {
+                let medal = '🥉';
+                if (index === 0) medal = '🥇';
+                else if (index === 1) medal = '🥈';
+
+                lbText += `${medal} *${user.name}* — 📦 *${user.totalOtp}* OTPs\n`;
+            });
+        }
+
+        await bot.sendMessage(chatId, lbText, {
+            parse_mode: 'Markdown',
+            reply_markup: mainMenu.reply_markup
+        });
+    } catch (error) {
+        console.error('Leaderboard error:', error.message);
+    }
+}
+
+
+// ===============================
 // SECURE SUCCESS OTP CHECKER
 // ===============================
 
-async function startFastOtpChecker(chatId, phoneNumber) {
+async function startFastOtpChecker(chatId, phoneNumber, userName = 'User') {
     const startTime = Date.now();
     const maxDurationMs = 15 * 60 * 1000;
     const intervalTime = 1000;
@@ -320,7 +356,7 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                         processedOtps.add(uniqueOtpId);
                         clearInterval(interval);
 
-                        const userData = getUserData(chatId);
+                        const userData = getUserData(chatId, userName);
                         userData.totalOtp += 1;
                         userData.totalEarned += OTP_REWARD_AMOUNT;
                         const maskedNumber = maskPhoneNumber(phoneNumber);
@@ -534,6 +570,7 @@ async function showCountriesForApp(chatId, messageId, appName) {
 
 bot.on('message', async (msg) => {
     const chatId = String(msg.chat.id);
+    const userName = msg.from.first_name || 'User';
     const text = msg.text ? msg.text.trim() : '';
 
     if (!text) return;
@@ -566,7 +603,7 @@ bot.on('message', async (msg) => {
     // --- WITHDRAW FLOW STEPS ---
     if (userState[chatId] && userState[chatId].step === 'waiting_for_withdraw_amount') {
         const amount = parseFloat(text);
-        const userData = getUserData(chatId);
+        const userData = getUserData(chatId, userName);
         const currentBalance = userData.totalEarned - userData.totalWithdrawn;
 
         if (isNaN(amount) || amount <= 0) {
@@ -593,7 +630,7 @@ bot.on('message', async (msg) => {
         const targetNumber = text;
         delete userState[chatId];
 
-        const userData = getUserData(chatId);
+        const userData = getUserData(chatId, userName);
         const currentBalance = userData.totalEarned - userData.totalWithdrawn;
 
         if (amount > currentBalance) {
@@ -605,7 +642,7 @@ bot.on('message', async (msg) => {
 
         const withdrawSlip = 
             `💸 *New Withdrawal Request!*\n\n` +
-            `👤 *User ID:* \`${chatId}\`\n` +
+            `👤 *User:* ${userName} (\`${chatId}\`)\n` +
             `💳 *Method:* \`${method}\`\n` +
             `📞 *Account Number:* \`${targetNumber}\`\n` +
             `💰 *Withdraw Amount:* \`${amount.toFixed(2)}\` ৳\n` +
@@ -622,11 +659,15 @@ bot.on('message', async (msg) => {
     if (userLocks[chatId]) return;
 
     if (text.includes('BALANCE') || text.toLowerCase() === 'stat') {
-        return sendBalance(chatId);
+        return sendBalance(chatId, userName);
+    }
+
+    if (text.includes('LEADERBOARD')) {
+        return sendLeaderboard(chatId);
     }
 
     if (text.includes('WITHDRAW')) {
-        const userData = getUserData(chatId);
+        const userData = getUserData(chatId, userName);
         const currentBalance = userData.totalEarned - userData.totalWithdrawn;
 
         if (!ADMIN_IDS.includes(chatId) && currentBalance < MIN_WITHDRAW_AMOUNT) {
@@ -676,6 +717,7 @@ bot.on('callback_query', async (query) => {
         if (!query.message || !query.message.chat) return;
 
         const chatId = String(query.message.chat.id);
+        const userName = query.from.first_name || 'User';
         const messageId = query.message.message_id;
         const data = query.data;
 
@@ -688,7 +730,7 @@ bot.on('callback_query', async (query) => {
             if (methodCode === 'nagad') methodName = 'Nagad 🟠';
             if (methodCode === 'rocket') methodName = 'Rocket 🟣';
 
-            const userData = getUserData(chatId);
+            const userData = getUserData(chatId, userName);
             const currentBalance = userData.totalEarned - userData.totalWithdrawn;
 
             userState[chatId] = { step: 'waiting_for_withdraw_amount', method: methodName };
@@ -759,7 +801,7 @@ bot.on('callback_query', async (query) => {
             const finalCountry = phoneData.country || phoneData.country_name || 'Global';
             const flagEmoji = getCountryFlag(finalCountry);
 
-            startFastOtpChecker(chatId, phoneNumber);
+            startFastOtpChecker(chatId, phoneNumber, userName);
 
             const numberKeyboard = {
                 reply_markup: {
