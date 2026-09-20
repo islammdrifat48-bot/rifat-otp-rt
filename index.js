@@ -2,6 +2,15 @@ const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 const fs = require('fs');
 const axios = require('axios');
+const admin = require('firebase-admin');
+
+// Firebase Initialization
+const serviceAccount = require('./serviceAccountKey.json');
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: "https://rifat-bot-data-default-rtdb.firebaseio.com" // আপনার ফায়ারবেস ডাটাবেজ ইউআরএল
+});
+const db = admin.database();
 
 const config = require('./config');
 const {
@@ -73,9 +82,8 @@ const PUBLIC_UID = 'MQUPBWI9AQJ';
 // আপনার টেলিগ্রাম অ্যাডমিন আইডি
 const ADMIN_ID = 6315111273;
 
-// ফাইল নেম কনফিগারেশন (সার্ভার ক্লিয়ার হলেও ডেটা মুছে যাবে না)
+// ফাইল নেম কনফিগারেশন (কাস্টম অ্যাপসের জন্য)
 const CUSTOM_APPS_FILE = 'custom_apps.json';
-const USERS_DATA_FILE = 'users_data.json';
 
 function loadCustomApps() {
     if (fs.existsSync(CUSTOM_APPS_FILE)) {
@@ -92,53 +100,50 @@ function saveCustomApps(data) {
     fs.writeFileSync(CUSTOM_APPS_FILE, JSON.stringify(data, null, 2), 'utf8');
 }
 
-// ইউজার ব্যালেন্স ও ডেটা লোড ও সেভ করার ফাংশন
-function loadUsersData() {
-    if (fs.existsSync(USERS_DATA_FILE)) {
-        try {
-            return JSON.parse(fs.readFileSync(USERS_DATA_FILE, 'utf8'));
-        } catch (e) {
-            return {};
+// ফায়ারবেস থেকে ইউজার ডেটা সিঙ্ক্রোনাসলি ক্যাশ বা হ্যান্ডেল করার জন্য মেমোরি ক্যাশ অথবা এসিনক্রোনাস ফাংশন
+async function getUserData(userId) {
+    try {
+        const ref = db.ref(`users/${userId}`);
+        const snapshot = await ref.once('value');
+        if (snapshot.exists()) {
+            return snapshot.val();
+        } else {
+            const defaultData = {
+                totalOtp: 0,
+                totalEarned: 0,
+                totalWithdrawn: 0
+            };
+            await ref.set(defaultData);
+            return defaultData;
         }
+    } catch (e) {
+        console.error('Error getting user data:', e.message);
+        return { totalOtp: 0, totalEarned: 0, totalWithdrawn: 0 };
     }
-    return {};
 }
 
-function saveUsersData(data) {
-    fs.writeFileSync(USERS_DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+async function updateUserData(userId, updaterFn) {
+    try {
+        const ref = db.ref(`users/${userId}`);
+        const snapshot = await ref.once('value');
+        let userData = snapshot.exists() ? snapshot.val() : {
+            totalOtp: 0,
+            totalEarned: 0,
+            totalWithdrawn: 0
+        };
+        
+        updaterFn(userData);
+        await ref.set(userData);
+    } catch (e) {
+        console.error('Error updating user data:', e.message);
+    }
 }
+
 
 // আপনার নির্দিষ্ট চ্যানেল দুটি
 const CHANNEL_METHOD = 'https://t.me/otpmethod_r';
 const CHANNEL_OTP_GROUP = 'https://t.me/otpgroup_rt';
 const METHOD_CHANNEL_USERNAME = '@otpmethod_r';
-
-
-function getUserData(userId) {
-    let allUsers = loadUsersData();
-    if (!allUsers[userId]) {
-        allUsers[userId] = {
-            totalOtp: 0,
-            totalEarned: 0,
-            totalWithdrawn: 0
-        };
-        saveUsersData(allUsers);
-    }
-    return allUsers[userId];
-}
-
-function updateUserData(userId, updaterFn) {
-    let allUsers = loadUsersData();
-    if (!allUsers[userId]) {
-        allUsers[userId] = {
-            totalOtp: 0,
-            totalEarned: 0,
-            totalWithdrawn: 0
-        };
-    }
-    updaterFn(allUsers[userId]);
-    saveUsersData(allUsers);
-}
 
 
 // ===============================
@@ -255,7 +260,7 @@ function getMainMenuMarkup(userId) {
 bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
     const chatId = msg.chat.id;
     delete userState[chatId];
-    getUserData(chatId);
+    await getUserData(chatId);
 
     try {
         await bot.sendMessage(
@@ -287,7 +292,7 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
 
 async function sendBalance(chatId) {
     delete userState[chatId];
-    const data = getUserData(chatId);
+    const data = await getUserData(chatId);
     const currentBalance = data.totalEarned - data.totalWithdrawn;
 
     const balanceMsg =
@@ -364,8 +369,8 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                         processedOtps.add(uniqueOtpId);
                         clearInterval(interval);
 
-                        // পার্মানেন্ট ফাইল ডাটা আপডেট করা
-                        updateUserData(chatId, (userData) => {
+                        // ফায়ারবেসে পার্মানেন্ট ডেটা আপডেট করা
+                        await updateUserData(chatId, (userData) => {
                             userData.totalOtp += 1;
                             userData.totalEarned += OTP_REWARD_AMOUNT;
                         });
@@ -675,7 +680,7 @@ bot.on('message', async (msg) => {
     // উইথড্র ধাপ ১: ইউজার উইথড্র করার পরিমাণ (অ্যামাউন্ট) লিখে পাঠালে
     if (userState[chatId] && userState[chatId].step === 'waiting_for_withdraw_amount') {
         const amount = parseFloat(text);
-        const userData = getUserData(chatId);
+        const userData = await getUserData(chatId);
         const currentBalance = userData.totalEarned - userData.totalWithdrawn;
 
         if (isNaN(amount) || amount <= 0) {
@@ -704,7 +709,7 @@ bot.on('message', async (msg) => {
         const targetNumber = text;
         delete userState[chatId];
 
-        const userData = getUserData(chatId);
+        const userData = await getUserData(chatId);
         const currentBalance = userData.totalEarned - userData.totalWithdrawn;
 
         if (amount > currentBalance) {
@@ -712,7 +717,7 @@ bot.on('message', async (msg) => {
         }
 
         // নির্দিষ্ট পরিমাণ ব্যালেন্স কেটে উইথড্র রেজিস্টার করা
-        updateUserData(chatId, (uData) => {
+        await updateUserData(chatId, (uData) => {
             uData.totalWithdrawn += amount;
         });
 
@@ -743,7 +748,7 @@ bot.on('message', async (msg) => {
     }
 
     if (text.includes('WITHDRAW')) {
-        const userData = getUserData(chatId);
+        const userData = await getUserData(chatId);
         const currentBalance = userData.totalEarned - userData.totalWithdrawn;
 
         if (chatId !== ADMIN_ID && currentBalance < MIN_WITHDRAW_AMOUNT) {
@@ -809,7 +814,7 @@ bot.on('callback_query', async (query) => {
             if (methodCode === 'nagad') methodName = 'Nagad 🟠';
             if (methodCode === 'rocket') methodName = 'Rocket 🟣';
 
-            const userData = getUserData(chatId);
+            const userData = await getUserData(chatId);
             const currentBalance = userData.totalEarned - userData.totalWithdrawn;
 
             userState[chatId] = { step: 'waiting_for_withdraw_amount', method: methodName };
@@ -929,7 +934,7 @@ bot.on('callback_query', async (query) => {
                 saveCustomApps(customData);
             }
 
-            await bot.answerCallbackQuery(query.id, { text: '✅ রেঞ্জটি সফলভাবে ডিলিট করা হয়েছে!', show_alert: true });
+            await bot.answerCallbackQuery(query.id, { text: '✅ রেঞ্জটি সফলভাবে ডিলিট করা হয়েছে!' });
             return bot.editMessageText(`✅ রেঞ্জ সফলভাবে ডিলিট করা হয়েছে।`, {
                 chat_id: chatId,
                 message_id: messageId,
