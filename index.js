@@ -4,8 +4,9 @@ const http = require('http');
 const config = require('./config');
 const {
     getLiveAccess,
-    getNewNumber,
-    getSuccessOtp
+    getSuccessOtp,
+    axiosInstance,
+    getHeaders
 } = require('./api');
 
 // Bot initialization with explicit polling options and webhook disable
@@ -19,6 +20,9 @@ const bot = new TelegramBot(config.BOT_TOKEN, {
     },
     webHook: false
 });
+
+// Purge any pending webhooks or conflicting getUpdates streams to fix 409 Conflict permanently
+bot.deleteWebHook().catch(() => {});
 
 // ===============================
 // ERROR HANDLING
@@ -55,18 +59,50 @@ bot.getMe()
 
 
 // ===============================
+// EXACT getNewNumber FUNCTION
+// ===============================
+async function getNewNumber(rangeId) {
+    try {
+        const payload = {};
+
+        if (rangeId) {
+            payload.rid = String(rangeId).replace(/[^0-9]/g, '');
+        }
+
+        const response = await axiosInstance.post(
+            `${config.BASE_URL}/getnum`,
+            payload,
+            {
+                headers: getHeaders()
+            }
+        );
+
+        return response.data;
+
+    } catch (error) {
+        if (error.response) {
+            console.error('API getNewNumber error status:', error.response.status);
+            console.error('API getNewNumber error data:', error.response.data);
+        } else {
+            console.error('API getNewNumber error:', error.message);
+        }
+
+        return null;
+    }
+}
+
+
+// ===============================
 // USER DATA & SECURITY MAP
 // ===============================
 
-const userLocks = {};
 const userState = {};
 const userBalance = {};
 const processedOtps = new Set();
 
-const MIN_WITHDRAW_AMOUNT = 500.00; // সর্বনিম্ন উইথড্র ৫০০ টাকা
+const MIN_WITHDRAW_AMOUNT = 500.00;
 const OTP_REWARD_AMOUNT = 0.70;
 
-const PUBLIC_UID = 'MQUPBWI9AQJ';
 const METHOD_CHANNEL = '@otpmethod_r';
 const ADMIN_IDS = ['6315111273'];
 
@@ -313,7 +349,7 @@ async function sendLeaderboard(chatId) {
 
 
 // ===============================
-// SECURE SUCCESS OTP CHECKER (ORIGINAL & UNCHANGED)
+// SECURE SUCCESS OTP CHECKER
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber, userName = 'User') {
@@ -424,19 +460,6 @@ async function showAppsMenu(chatId, messageId = null) {
             return;
         }
 
-        const liveData = await getLiveAccess();
-        const rawServices = liveData?.data?.services || liveData?.data || [];
-        const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
-
-        const apiAppsSet = new Set();
-        items.forEach(service => {
-            if (!service) return;
-            const sName = service.sid || service.name || service.title || service.service || service.app_name;
-            if (sName) {
-                apiAppsSet.add(String(sName).trim());
-            }
-        });
-
         const inlineKeyboard = [];
         let row = [];
 
@@ -449,7 +472,6 @@ async function showAppsMenu(chatId, messageId = null) {
             'discord': '🎮'
         };
 
-        // ১. কাস্টম অ্যাপস সবার উপরে
         Object.keys(customAppsData).forEach(appName => {
             const cleanName = String(appName).trim();
             const icon = appIcons[cleanName.toLowerCase()] || '🚀';
@@ -465,23 +487,34 @@ async function showAppsMenu(chatId, messageId = null) {
             }
         });
 
-        // ২. এপিআই অ্যাপস এর নিচে
-        apiAppsSet.forEach(appName => {
-            const cleanName = String(appName).trim();
-            if (!customAppsData[cleanName]) {
-                const icon = appIcons[cleanName.toLowerCase()] || '📱';
+        try {
+            const liveData = await getLiveAccess();
+            const rawServices = liveData?.data?.services || liveData?.data || [];
+            const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
 
-                row.push({
-                    text: `${icon}${cleanName}`,
-                    callback_data: `app_${cleanName}`
-                });
+            items.forEach(service => {
+                if (!service) return;
+                const sName = service.sid || service.name || service.title || service.service || service.app_name;
+                if (sName) {
+                    const cleanName = String(sName).trim();
+                    if (!customAppsData[cleanName]) {
+                        const icon = appIcons[cleanName.toLowerCase()] || '📱';
 
-                if (row.length === 2) {
-                    inlineKeyboard.push(row);
-                    row = [];
+                        row.push({
+                            text: `${icon}${cleanName}`,
+                            callback_data: `app_${cleanName}`
+                        });
+
+                        if (row.length === 2) {
+                            inlineKeyboard.push(row);
+                            row = [];
+                        }
+                    }
                 }
-            }
-        });
+            });
+        } catch (apiErr) {
+            console.log('Live access API offline, showing custom apps only.');
+        }
 
         if (row.length > 0) {
             inlineKeyboard.push(row);
@@ -613,7 +646,7 @@ async function showCustomAppCountries(chatId, messageId, appName) {
 
 
 // ===============================
-// MESSAGE HANDLER (TEXT & ADMIN & WITHDRAW)
+// MESSAGE HANDLER
 // ===============================
 
 bot.on('message', async (msg) => {
@@ -627,7 +660,6 @@ bot.on('message', async (msg) => {
         delete userState[chatId];
     }
 
-    // --- ADMIN PANEL INPUT STEPS ---
     if (ADMIN_IDS.includes(chatId)) {
         if (userState[chatId]?.step === 'waiting_for_new_app_name') {
             const appName = text;
@@ -654,12 +686,11 @@ bot.on('message', async (msg) => {
                 delete userState[chatId];
                 return bot.sendMessage(chatId, `✅ সফলভাবে রেঞ্জ যোগ করা হয়েছে!\n\nApp: *${appName}*\nCountry: ${flag} *${countryName}*\nRange: \`${range}\``, { parse_mode: 'Markdown' });
             } else {
-                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে দিন:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`togo, 🇹🇬, +22891xxx\``, { parse_mode: 'Markdown' });
+                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে দিন:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Togo, 🇹🇬, +38091XXX\``, { parse_mode: 'Markdown' });
             }
         }
     }
 
-    // --- WITHDRAW FLOW STEPS ---
     if (userState[chatId] && userState[chatId].step === 'waiting_for_withdraw_amount') {
         const amount = parseFloat(text);
         const userData = getUserData(chatId, userName);
@@ -785,7 +816,6 @@ bot.on('callback_query', async (query) => {
 
         await bot.answerCallbackQuery(query.id).catch(() => {});
 
-        // --- WITHDRAW CALLBACKS ---
         if (data.startsWith('wd_')) {
             const methodCode = data.replace('wd_', '');
             let methodName = '';
@@ -800,7 +830,6 @@ bot.on('callback_query', async (query) => {
             return bot.sendMessage(chatId, `💳 মাধ্যম: *${methodName}*\n\nবর্তমান ব্যালেন্স: *${currentBalance.toFixed(2)} ৳*\n\nকত টাকা উইথড্র করতে চান সেই পরিমাণ লিখে পাঠান (সর্বনিম্ন ${MIN_WITHDRAW_AMOUNT} ৳):`, { parse_mode: 'Markdown' });
         }
 
-        // --- ADMIN PANEL CALLBACKS ---
         if (data === 'admin_add_app' && ADMIN_IDS.includes(chatId)) {
             userState[chatId] = { step: 'waiting_for_new_app_name' };
             return bot.sendMessage(chatId, `✍️ নতুন কাস্টম অ্যাপের নাম লিখে পাঠান:`, { parse_mode: 'Markdown' });
@@ -826,7 +855,7 @@ bot.on('callback_query', async (query) => {
         if (data.startsWith('admin_select_app_') && ADMIN_IDS.includes(chatId)) {
             const appName = data.replace('admin_select_app_', '');
             userState[chatId] = { step: 'waiting_for_range_input', appName: appName };
-            return bot.sendMessage(chatId, `✍️ **${appName}** এর জন্য নিচের ফরম্যাটে তথ্য পাঠান:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`togo, 🇹🇬, +22891xxx\``, { parse_mode: 'Markdown' });
+            return bot.sendMessage(chatId, `✍️ **${appName}** এর জন্য নিচের ফরম্যাটে তথ্য পাঠান:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Togo, 🇹🇬, +38091XXX\``, { parse_mode: 'Markdown' });
         }
 
         if (data === 'admin_delete_menu' && ADMIN_IDS.includes(chatId)) {
@@ -949,8 +978,7 @@ bot.on('callback_query', async (query) => {
 
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId }).catch(() => {});
 
-            // একদম নিখুঁতভাবে আসল রেঞ্জ পাস করার লজিক
-            const actualNumResult = await getNewNumber(PUBLIC_UID, item.range).catch(() => null);
+            const actualNumResult = await getNewNumber(item.range).catch(() => null);
             
             if (!actualNumResult || !actualNumResult.data) {
                 return bot.editMessageText('❌ Failed to allocate number from panel. Try another range.', { chat_id: chatId, message_id: messageId }).catch(() => {});
@@ -995,7 +1023,7 @@ bot.on('callback_query', async (query) => {
 
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId }).catch(() => {});
 
-            const actualNumResult = await getNewNumber(PUBLIC_UID, targetRange).catch(() => null);
+            const actualNumResult = await getNewNumber(targetRange).catch(() => null);
             
             if (!actualNumResult || !actualNumResult.data) {
                 return bot.editMessageText('❌ Failed to allocate number from panel. Try another range.', { chat_id: chatId, message_id: messageId }).catch(() => {});
@@ -1036,7 +1064,7 @@ bot.on('callback_query', async (query) => {
 
 
 // ===============================
-// HTTP SERVER (RENDER PORT BINDING)
+// HTTP SERVER
 // ===============================
 
 const server = http.createServer((req, res) => {
