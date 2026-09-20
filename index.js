@@ -314,7 +314,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE SUCCESS OTP CHECKER (Fixed & Matched)
+// SECURE SUCCESS OTP CHECKER (Updated with requested format)
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
@@ -395,10 +395,15 @@ async function startFastOtpChecker(chatId, phoneNumber) {
                             ...otpKeyboard
                         });
 
-                        await bot.sendMessage(config.REQUIRED_CHANNEL, `📢 *New Channel OTP Alert*\n\n` + otpMsg, {
-                            parse_mode: 'Markdown',
-                            ...otpKeyboard
-                        });
+                        // এখানে REQUIRED_CHANNEL-এ OTP notification পাঠানো হচ্ছে
+                        await bot.sendMessage(
+                            config.REQUIRED_CHANNEL,
+                            `📢 *New Channel OTP Alert*\n\n` + otpMsg,
+                            {
+                                parse_mode: 'Markdown',
+                                ...otpKeyboard
+                            }
+                        );
 
                         return;
                     }
