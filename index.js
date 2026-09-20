@@ -70,7 +70,7 @@ const PUBLIC_UID = 'MQUPBWI9AQJ';
 const METHOD_CHANNEL = '@otpmethod_r';
 const ADMIN_IDS = ['6315111273'];
 
-// কাস্টম অ্যাপ ও রেঞ্জ স্টোরেজ structure: { appName, ranges: [{ countryName, flag, range }] }
+// কাস্টম অ্যাপ ও রেঞ্জ স্টোরেজ
 let customAppsData = {};
 
 
@@ -525,9 +525,9 @@ async function showCountriesForApp(chatId, messageId, appName) {
                     
                     let rangeVal = '';
                     if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
-                        rangeVal = String(service.ranges[0]).replace(/[^0-9]/g, '');
+                        rangeVal = String(service.ranges[0]);
                     } else if (service.range) {
-                        rangeVal = String(service.range).replace(/[^0-9]/g, '');
+                        rangeVal = String(service.range);
                     } else if (service.rid) {
                         rangeVal = String(service.rid);
                     }
@@ -654,7 +654,7 @@ bot.on('message', async (msg) => {
                 delete userState[chatId];
                 return bot.sendMessage(chatId, `✅ সফলভাবে রেঞ্জ যোগ করা হয়েছে!\n\nApp: *${appName}*\nCountry: ${flag} *${countryName}*\nRange: \`${range}\``, { parse_mode: 'Markdown' });
             } else {
-                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে দিন:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Poland, 🇵🇱, 38091xxx\``, { parse_mode: 'Markdown' });
+                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে দিন:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Poland, 🇵🇱, 22898\` বা \`Poland, 🇵🇱, 38091\``, { parse_mode: 'Markdown' });
             }
         }
     }
@@ -826,7 +826,7 @@ bot.on('callback_query', async (query) => {
         if (data.startsWith('admin_select_app_') && ADMIN_IDS.includes(chatId)) {
             const appName = data.replace('admin_select_app_', '');
             userState[chatId] = { step: 'waiting_for_range_input', appName: appName };
-            return bot.sendMessage(chatId, `✍️ **${appName}** এর জন্য নিচের ফরম্যাটে তথ্য পাঠান:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Poland, 🇵🇱, 38091xxx\``, { parse_mode: 'Markdown' });
+            return bot.sendMessage(chatId, `✍️ **${appName}** এর জন্য নিচের ফরম্যাটে তথ্য পাঠান:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Poland, 🇵🇱, 22898\``, { parse_mode: 'Markdown' });
         }
 
         if (data === 'admin_delete_menu' && ADMIN_IDS.includes(chatId)) {
@@ -950,7 +950,7 @@ bot.on('callback_query', async (query) => {
 
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId }).catch(() => {});
 
-            // রেঞ্জ থেকে শুধু নাম্বার/কোড অংশটুকু পরিষ্কার করে পাঠানো হচ্ছে (প্লাস বা অতিরিক্ত চিহ্ন বাদ দিয়ে)
+            // সার্ভারে পাঠানোর জন্য রেঞ্জ থেকে শুধু সংখ্যাগুলো আলাদা করা হচ্ছে
             const cleanRange = String(item.range).replace(/[^0-9]/g, '');
 
             const actualNumResult = await getNewNumber(PUBLIC_UID, cleanRange).catch(() => null);
