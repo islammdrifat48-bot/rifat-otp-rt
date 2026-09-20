@@ -654,7 +654,7 @@ bot.on('message', async (msg) => {
                 delete userState[chatId];
                 return bot.sendMessage(chatId, `✅ সফলভাবে রেঞ্জ যোগ করা হয়েছে!\n\nApp: *${appName}*\nCountry: ${flag} *${countryName}*\nRange: \`${range}\``, { parse_mode: 'Markdown' });
             } else {
-                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে দিন:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Poland, 🇵🇱, 22898\` বা \`Poland, 🇵🇱, 38091\``, { parse_mode: 'Markdown' });
+                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে দিন:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`togo, 🇹🇬, +22891xxx\``, { parse_mode: 'Markdown' });
             }
         }
     }
@@ -826,7 +826,7 @@ bot.on('callback_query', async (query) => {
         if (data.startsWith('admin_select_app_') && ADMIN_IDS.includes(chatId)) {
             const appName = data.replace('admin_select_app_', '');
             userState[chatId] = { step: 'waiting_for_range_input', appName: appName };
-            return bot.sendMessage(chatId, `✍️ **${appName}** এর জন্য নিচের ফরম্যাটে তথ্য পাঠান:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Poland, 🇵🇱, 22898\``, { parse_mode: 'Markdown' });
+            return bot.sendMessage(chatId, `✍️ **${appName}** এর জন্য নিচের ফরম্যাটে তথ্য পাঠান:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`togo, 🇹🇬, +22891xxx\``, { parse_mode: 'Markdown' });
         }
 
         if (data === 'admin_delete_menu' && ADMIN_IDS.includes(chatId)) {
@@ -918,7 +918,6 @@ bot.on('callback_query', async (query) => {
             return bot.editMessageText(txt, {
                 chat_id: chatId,
                 message_id: messageId,
-                parse_mode: 'Markdown',
                 reply_markup: { inline_keyboard: [[{ text: '🔙 Back', callback_data: 'admin_back' }]] }
             }).catch(() => {});
         }
@@ -950,7 +949,7 @@ bot.on('callback_query', async (query) => {
 
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId }).catch(() => {});
 
-            // সার্ভারে পাঠানোর জন্য রেঞ্জ থেকে শুধু সংখ্যাগুলো আলাদা করা হচ্ছে
+            // এখান থেকে রেঞ্জের ভেতরের শুধু সংখ্যাগুলো (যেমন: 22891xxx থেকে সংখ্যা) বা এপিআইয়ের জন্য সঠিক ফরম্যাট তৈরি করা হচ্ছে
             const cleanRange = String(item.range).replace(/[^0-9]/g, '');
 
             const actualNumResult = await getNewNumber(PUBLIC_UID, cleanRange).catch(() => null);
