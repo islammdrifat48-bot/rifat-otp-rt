@@ -245,7 +245,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE SUCCESS OTP CHECKER (API Response Structure Matched)
+// SECURE SUCCESS OTP CHECKER
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
@@ -266,7 +266,6 @@ async function startFastOtpChecker(chatId, phoneNumber) {
         try {
             const otpResult = await getSuccessOtp();
             if (otpResult && otpResult.data) {
-                // ভোল্টেক্স এপিআই স্ট্রাকচার অনুযায়ী data.otps চেক করা হচ্ছে
                 const otpsList = otpResult.data.otps || otpResult.data.data || otpResult.data;
                 const items = Array.isArray(otpsList) ? otpsList : Object.values(otpsList);
 
@@ -364,17 +363,16 @@ async function showAppsMenu(chatId, messageId = null) {
         const liveData = await getLiveAccess();
         if (!liveData || !liveData.data) {
             const errText = '❌ No active services available from panel right now.';
-            if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
+            if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId }).catch(() => {});
             return bot.sendMessage(chatId, errText);
         }
 
-        // ভোল্টেক্স লাইভ এক্সেস রেসপন্স স্ট্রাকচার অনুযায়ী data.services পার্স করা
         const rawServices = liveData.data.services || liveData.data;
         const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
 
         if (!items || items.length === 0) {
             const errText = '❌ No active services available from panel right now.';
-            if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
+            if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId }).catch(() => {});
             return bot.sendMessage(chatId, errText);
         }
 
@@ -422,13 +420,13 @@ async function showAppsMenu(chatId, messageId = null) {
         const reply_markup = { inline_keyboard: inlineKeyboard };
 
         if (messageId) {
-            return bot.editMessageText(menuText, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup });
+            return bot.editMessageText(menuText, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup }).catch(() => {});
         } else {
             return bot.sendMessage(chatId, menuText, { parse_mode: 'Markdown', reply_markup });
         }
     } catch (error) {
         console.error('ShowAppsMenu Error:', error);
-        await bot.sendMessage(chatId, '❌ Failed to load services.');
+        await bot.sendMessage(chatId, '❌ Failed to load services.').catch(() => {});
     }
 }
 
@@ -492,7 +490,7 @@ async function showCountriesForApp(chatId, messageId, appName) {
             message_id: messageId,
             parse_mode: 'Markdown',
             reply_markup
-        });
+        }).catch(() => {});
     } catch (error) {
         console.error('ShowCountriesForApp Error:', error);
     }
@@ -523,7 +521,7 @@ bot.on('message', async (msg) => {
                 ]
             }
         };
-        return bot.sendMessage(chatId, `🎧 *Support*\n\nFor any issues, contact Admin.`, { parse_mode: 'Markdown', ...supportKeyboard });
+        return bot.sendMessage(chatId, `🎧 *Support*\n\nFor any issues, contact Admin.`, { parse_mode: 'Markdown', ...supportKeyboard }).catch(() => {});
     }
 
     if (text.includes('GET ACTIVE NUMBER') || text.includes('REFRESH')) {
@@ -533,7 +531,7 @@ bot.on('message', async (msg) => {
 
 
 // ===============================
-// CALLBACK QUERY HANDLER
+// CALLBACK QUERY HANDLER (FIXED)
 // ===============================
 
 bot.on('callback_query', async (query) => {
@@ -544,14 +542,15 @@ bot.on('callback_query', async (query) => {
         const messageId = query.message.message_id;
         const data = query.data;
 
+        // প্রমিজ ফেইল ও লোডিং সমস্যা সমাধানের জন্য সাথে সাথে answerCallbackQuery কল করা হলো
+        await bot.answerCallbackQuery(query.id).catch(() => {});
+
         if (data === 'back_to_apps') {
-            await bot.answerCallbackQuery(query.id);
             return showAppsMenu(chatId, messageId);
         }
 
         if (data && data.startsWith('app_')) {
             const appName = data.replace('app_', '');
-            await bot.answerCallbackQuery(query.id);
             return showCountriesForApp(chatId, messageId, appName);
         }
 
@@ -560,14 +559,12 @@ bot.on('callback_query', async (query) => {
             const targetRange = parts[1];
             const appName = decodeURIComponent(parts[2] || 'Service');
 
-            await bot.answerCallbackQuery(query.id, { text: 'Allocating number...' });
-            await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId });
+            await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId }).catch(() => {});
 
-            // getNewNumber এপিআই কল (রেন্ডার লগ অনুযায়ী ফাংশনটি এখন সরাসরি এক্সিকিউট হবে)
-            const actualNumResult = await getNewNumber(targetRange);
+            const actualNumResult = await getNewNumber(PUBLIC_UID, targetRange).catch(() => null);
             
             if (!actualNumResult || !actualNumResult.data) {
-                return bot.editMessageText('❌ Failed to allocate number from panel. Try another range.', { chat_id: chatId, message_id: messageId });
+                return bot.editMessageText('❌ Failed to allocate number from panel. Try another range.', { chat_id: chatId, message_id: messageId }).catch(() => {});
             }
 
             const phoneData = actualNumResult.data;
@@ -575,7 +572,6 @@ bot.on('callback_query', async (query) => {
             const finalCountry = phoneData.country || phoneData.country_name || 'Global';
             const flagEmoji = getCountryFlag(finalCountry);
 
-            // অটো ওটিপি ট্র্যাকার চালু করা হলো
             startFastOtpChecker(chatId, phoneNumber);
 
             const numberKeyboard = {
@@ -598,7 +594,7 @@ bot.on('callback_query', async (query) => {
                 `✅ *Status:* Active Number Allocated\n` +
                 `⏰ *Validity:* 15 Minutes`,
                 { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', ...numberKeyboard }
-            );
+            ).catch(() => {});
         }
     } catch (error) {
         console.error('Callback Error:', error.message);
