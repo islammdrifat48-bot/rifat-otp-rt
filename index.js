@@ -313,7 +313,7 @@ async function sendLeaderboard(chatId) {
 
 
 // ===============================
-// SECURE SUCCESS OTP CHECKER (ORIGINAL LOGIC)
+// SECURE SUCCESS OTP CHECKER (ORIGINAL & UNCHANGED)
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber, userName = 'User') {
@@ -408,7 +408,7 @@ async function startFastOtpChecker(chatId, phoneNumber, userName = 'User') {
 
 
 // ===============================
-// STEP 1: APPS MENU BUILDER (CUSTOM APPS ON TOP)
+// STEP 1: APPS MENU BUILDER
 // ===============================
 async function showAppsMenu(chatId, messageId = null) {
     try {
@@ -449,7 +449,7 @@ async function showAppsMenu(chatId, messageId = null) {
             'discord': '🎮'
         };
 
-        // ১. কাস্টম অ্যাডমিন অ্যাপস সবার উপরে যোগ করা হবে
+        // ১. কাস্টম অ্যাপস সবার উপরে
         Object.keys(customAppsData).forEach(appName => {
             const cleanName = String(appName).trim();
             const icon = appIcons[cleanName.toLowerCase()] || '🚀';
@@ -465,7 +465,7 @@ async function showAppsMenu(chatId, messageId = null) {
             }
         });
 
-        // ২. বাকি এপিআই অ্যাপগুলো এর নিচে যোগ করা হবে
+        // ২. এপিআই অ্যাপস এর নিচে
         apiAppsSet.forEach(appName => {
             const cleanName = String(appName).trim();
             if (!customAppsData[cleanName]) {
@@ -623,7 +623,6 @@ bot.on('message', async (msg) => {
 
     if (!text) return;
 
-    // মেনু কমান্ডে গেলে পুরনো স্টেট ক্লিয়ার করা যাতে বাটন ফ্রিজ না হয়
     if (text.startsWith('/') || text.includes('GET ACTIVE NUMBER') || text.includes('BALANCE') || text.includes('LEADERBOARD') || text.includes('SUPPORT') || text.includes('WITHDRAW') || text.includes('ADMIN PANEL')) {
         delete userState[chatId];
     }
@@ -641,7 +640,6 @@ bot.on('message', async (msg) => {
 
         else if (userState[chatId]?.step === 'waiting_for_range_input') {
             const appName = userState[chatId].appName;
-            // ফরম্যাট: Country Name, Flag, Range (যেমন: Poland, 🇵🇱, 38091xxx)
             const parts = text.split(',').map(p => p.trim());
             if (parts.length >= 3) {
                 const countryName = parts[0];
@@ -952,7 +950,10 @@ bot.on('callback_query', async (query) => {
 
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId }).catch(() => {});
 
-            const actualNumResult = await getNewNumber(PUBLIC_UID, item.range).catch(() => null);
+            // রেঞ্জ থেকে শুধু নাম্বার/কোড অংশটুকু পরিষ্কার করে পাঠানো হচ্ছে (প্লাস বা অতিরিক্ত চিহ্ন বাদ দিয়ে)
+            const cleanRange = String(item.range).replace(/[^0-9]/g, '');
+
+            const actualNumResult = await getNewNumber(PUBLIC_UID, cleanRange).catch(() => null);
             
             if (!actualNumResult || !actualNumResult.data) {
                 return bot.editMessageText('❌ Failed to allocate number from panel. Try another range.', { chat_id: chatId, message_id: messageId }).catch(() => {});
