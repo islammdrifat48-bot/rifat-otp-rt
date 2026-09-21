@@ -75,9 +75,9 @@ const METHOD_CHANNEL = '@otpmethod_r';
 // অ্যাডমিন আইডি লিস্ট
 const ADMIN_IDS = ['6315111273'];
 
-// কাস্টম অ্যাপ ও রেঞ্জ স্টোরেজ
+// একাধিক কাস্টম অ্যাপ ও রেঞ্জ স্টোরেজ (আনলিমিটেড অ্যাড করার জন্য অ্যারে)
 const customAdminApps = []; // ফরম্যাট: { appName, country, rangeVal }
-const customAdminRanges = []; // ফরম্যাট: { rangeLabel }
+const customAdminRanges = []; // ফরম্যাট: { country, rangeLabel }
 
 
 function getUserData(userId) {
@@ -228,7 +228,6 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
     }
 });
 
-// অ্যাডমিন প্যানেল কমান্ড বা মেনু বাটন
 async function sendAdminPanel(chatId) {
     if (!ADMIN_IDS.includes(String(chatId))) {
         return bot.sendMessage(chatId, '❌ You are not authorized to use the admin panel.');
@@ -296,7 +295,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE SUCCESS OTP CHECKER
+// SECURE SUCCESS OTP CHECKER (SAFE & UNTOUCHED)
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
@@ -540,10 +539,11 @@ async function showCountriesForApp(chatId, messageId, appName) {
             }
         });
 
-        // অ্যাডমিন প্যানেল থেকে যোগ করা ফ্রি রেঞ্জ লেবেলগুলো যুক্ত করা
+        // কাস্টম অ্যাড করা সব রেঞ্জগুলো ডায়নামিক ও নিখুঁতভাবে পতাকাসহ দেখানোর লজিক
         customAdminRanges.forEach(rItem => {
+            const flag = getCountryFlag(rItem.country);
             row.push({
-                text: `🌐 ${rItem.rangeLabel}`,
+                text: `${flag} ${rItem.country} /${rItem.rangeLabel}`,
                 callback_data: `num_${rItem.rangeLabel}_${encodeURIComponent(appName)}`
             });
 
@@ -586,12 +586,11 @@ bot.on('message', async (msg) => {
     if (text.startsWith('/start') || text.startsWith('/admin') || text.startsWith('/stat')) return;
     if (userLocks[chatId]) return;
 
-    // অ্যাডমিন প্যানেল বাটন ক্লিক হ্যান্ডেল
     if (text.includes('ADMIN PANEL')) {
         return sendAdminPanel(chatId);
     }
 
-    // অ্যাডমিন অ্যাপ ইনপুট প্রম্পট
+    // অ্যাপ অ্যাড করার প্রম্পট
     if (userState[chatId] && userState[chatId].step === 'waiting_for_app_input') {
         if (!ADMIN_IDS.includes(String(chatId))) return;
         
@@ -610,15 +609,23 @@ bot.on('message', async (msg) => {
         return bot.sendMessage(chatId, `✅ *App Added Successfully!*\n\nApp: \`${appName}\`\nCountry: \`${country}\`\nRange: \`${rangeVal}\``, { parse_mode: 'Markdown' });
     }
 
-    // অ্যাডমিন রেঞ্জ ইনপুট প্রম্পট
+    // আনলিমিটেড রেঞ্জ অ্যাড করার প্রম্পট (ফরম্যাট: দেশ, রেঞ্জ লেবেল/ভ্যালু)
     if (userState[chatId] && userState[chatId].step === 'waiting_for_range_input') {
         if (!ADMIN_IDS.includes(String(chatId))) return;
 
-        const rangeLabel = text;
-        customAdminRanges.push({ rangeLabel });
+        const parts = text.split(',').map(p => p.trim());
+        if (parts.length < 2) {
+            return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে পাঠান!\n\nউদাহরণ:\n\`Bangladesh, 28892xxx\`\nঅথবা\n\`BD, 28892xxx\``, { parse_mode: 'Markdown' });
+        }
+
+        const country = parts[0];
+        const rangeLabel = parts[1];
+        const flag = getCountryFlag(country);
+
+        customAdminRanges.push({ country, rangeLabel });
         delete userState[chatId];
 
-        return bot.sendMessage(chatId, `✅ *Range Added Successfully*\n\n📦 🌐/${rangeLabel}`, { parse_mode: 'Markdown' });
+        return bot.sendMessage(chatId, `✅ *Range Added Successfully*\n\n${flag}${country} / \`${rangeLabel}\``, { parse_mode: 'Markdown' });
     }
 
     if (text.includes('BALANCE') || text.toLowerCase() === 'stat') {
@@ -654,7 +661,6 @@ bot.on('callback_query', async (query) => {
         const messageId = query.message.message_id;
         const data = query.data;
 
-        // অ্যাডমিন প্যানেল বাটন অ্যাকশন
         if (data === 'admin_main_menu') {
             await bot.answerCallbackQuery(query.id);
             return bot.sendMessage(chatId, '🏠 Main Menu', { reply_markup: getMainMenuMarkup(chatId).reply_markup });
@@ -671,7 +677,7 @@ bot.on('callback_query', async (query) => {
             if (!ADMIN_IDS.includes(String(chatId))) return bot.answerCallbackQuery(query.id, { text: 'Unauthorized!' });
             userState[chatId] = { step: 'waiting_for_range_input' };
             await bot.answerCallbackQuery(query.id);
-            return bot.sendMessage(chatId, `➕ *ADD RANGE LABEL*\n\nRange-এর label/value পাঠান।\nউদাহরণ:\nBD-01\n28892xxx`, { parse_mode: 'Markdown' });
+            return bot.sendMessage(chatId, `➕ *ADD RANGE*\n\nদেশ ও রেঞ্জের লেবেল কমা দিয়ে পাঠান।\nউদাহরণ:\n\`Bangladesh, 28892xxx\``, { parse_mode: 'Markdown' });
         }
 
         if (data === 'admin_list_apps') {
@@ -705,8 +711,9 @@ bot.on('callback_query', async (query) => {
 
             let inlineKeyboard = [];
             customAdminRanges.forEach((item, index) => {
+                const flag = getCountryFlag(item.country);
                 inlineKeyboard.push([
-                    { text: `❌ Delete: ${item.rangeLabel}`, callback_data: `del_range_${index}` }
+                    { text: `❌ Delete: ${flag} ${item.country} / ${item.rangeLabel}`, callback_data: `del_range_${index}` }
                 ]);
             });
 
