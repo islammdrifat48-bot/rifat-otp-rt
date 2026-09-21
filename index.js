@@ -5,9 +5,7 @@ const axios = require('axios');
 const config = require('./config');
 const {
     getLiveAccess,
-    getSuccessOtp,
-    axiosInstance,
-    getHeaders
+    getSuccessOtp
 } = require('./api');
 
 // ===============================
@@ -20,14 +18,19 @@ async function getNewNumber(rid) {
             { rid: String(rid) },
             {
                 headers: {
-                    'mauthapi': config.API_KEY || 'আপনার_এপিআই_কী_এখানে_দিন',
+                    'mauthapi': config.VOLTX_API_KEY || 'MA8O4Z4K4VX',
                     'Content-Type': 'application/json'
                 }
             }
         );
         return response.data;
     } catch (error) {
-        console.error('GetNewNumber API Error:', error.message);
+        if (error.response) {
+            console.error('GetNewNumber API Error Status:', error.response.status);
+            console.error('GetNewNumber API Error Data:', error.response.data);
+        } else {
+            console.error('GetNewNumber API Error:', error.message);
+        }
         return null;
     }
 }
@@ -549,14 +552,15 @@ async function showCountriesForApp(chatId, messageId, appName) {
                     const flag = getCountryFlag(country);
                     
                     let rangeVal = '';
-                    if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
-                        rangeVal = String(service.ranges[0]).replace(/[^0-9]/g, '');
-                    } else if (service.range !== undefined && service.range !== null) {
-                        rangeVal = String(service.range).replace(/[^0-9]/g, '');
+                    let rangesList = service.ranges || service.range || [];
+                    if (!Array.isArray(rangesList)) rangesList = [rangesList];
+
+                    if (rangesList.length > 0) {
+                        rangeVal = String(rangesList[0]).replace(/[^0-9]/g, '');
                     } else if (service.rid !== undefined && service.rid !== null) {
-                        rangeVal = String(service.rid);
+                        rangeVal = String(service.rid).replace(/[^0-9]/g, '');
                     } else if (service.id !== undefined && service.id !== null) {
-                        rangeVal = String(service.id);
+                        rangeVal = String(service.id).replace(/[^0-9]/g, '');
                     }
 
                     if (rangeVal) {
@@ -680,7 +684,7 @@ bot.on('message', async (msg) => {
                 delete userState[chatId];
                 return bot.sendMessage(chatId, `✅ সফলভাবে রেঞ্জ যোগ করা হয়েছে!\n\nApp: *${appName}*\nCountry: ${flag} *${countryName}*\nRange: \`${range}\``, { parse_mode: 'Markdown' });
             } else {
-                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে দিন:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Togo, 🇹🇬, +38091XXX\``, { parse_mode: 'Markdown' });
+                return bot.sendMessage(chatId, `❌ সঠিক ফরম্যাটে দিন:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Togo, 🇹🇬, 26134\``, { parse_mode: 'Markdown' });
             }
         }
     }
@@ -849,7 +853,7 @@ bot.on('callback_query', async (query) => {
         if (data.startsWith('admin_select_app_') && ADMIN_IDS.includes(chatId)) {
             const appName = data.replace('admin_select_app_', '');
             userState[chatId] = { step: 'waiting_for_range_input', appName: appName };
-            return bot.sendMessage(chatId, `✍️ **${appName}** এর জন্য নিচের ফরম্যাটে তথ্য পাঠান:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Togo, 🇹🇬, +38091XXX\``, { parse_mode: 'Markdown' });
+            return bot.sendMessage(chatId, `✍️ **${appName}** এর জন্য নিচের ফরম্যাটে তথ্য পাঠান:\n\`কান্ট্রি_নাম, পতাকা_ইমোজি, রেঞ্জ\`\n\nউদাহরণ:\n\`Togo, 🇹🇬, 26134\``, { parse_mode: 'Markdown' });
         }
 
         if (data === 'admin_delete_menu' && ADMIN_IDS.includes(chatId)) {
