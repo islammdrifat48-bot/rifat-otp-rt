@@ -999,7 +999,7 @@ function startFastOtpChecker(chatId, phoneNumber) {
                         const otpMsg =
                             `🎉 *OTP Received Successfully!*\n\n` +
                             `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
-                            `📞 *Number:* \`${Number}\`\n` +
+                            `📞 *Number:* \`${phoneNumber}\`\n` +
                             `💬 *Details:* \`${messageText}\`\n` +
                             `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
                             `✅ OTP successfully credited to your account!`;
