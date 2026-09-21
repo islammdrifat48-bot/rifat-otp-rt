@@ -72,13 +72,11 @@ const PUBLIC_UID = 'MQUPBWI9AQJ';
 // মেথড গ্রুপের ইউজারনেম
 const METHOD_CHANNEL = '@otpmethod_r';
 
-// এডমিন আইডি (তোমার চ্যাট আইডি এখানে সেট করা হয়েছে)
+// এডমিন আইডি (তোমার চ্যাট আইডি)
 const ADMIN_ID = 6315111273;
 
 // ডায়নামিক কাস্টম অ্যাপস এবং রেঞ্জ ডেটা স্টোরেজ
-const customApps = {
-    // উদাহরণস্বরূপ স্ট্রাকচার: "Telegram": ["880", "91"]
-};
+const customApps = {};
 
 
 function getUserData(userId) {
@@ -106,7 +104,7 @@ function maskPhoneNumber(num) {
 
 
 // ===============================
-// AUTO COUNTRY FLAG GENERATOR (FROM RANGE/CODE)
+// AUTO COUNTRY FLAG GENERATOR
 // ===============================
 function getCountryFlag(countryInput) {
     if (!countryInput) return '🌐';
@@ -171,7 +169,7 @@ async function checkChannelMember(userId) {
 
 
 // ===============================
-// MAIN MENU (Updated with buttons matching your UI image)
+// MAIN MENU
 // ===============================
 
 const mainMenu = {
@@ -258,7 +256,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// LEADERBOARD (Top 3 Earners)
+// LEADERBOARD
 // ===============================
 async function sendLeaderboard(chatId) {
     const allUsers = Object.values(userBalance);
@@ -286,7 +284,7 @@ async function sendLeaderboard(chatId) {
 
 
 // ===============================
-// WITHDRAW SYSTEM (Real-time bKash, Nagad, Rocket)
+// WITHDRAW SYSTEM
 // ===============================
 async function handleWithdrawStart(chatId) {
     const uData = getUserData(chatId);
@@ -396,18 +394,26 @@ async function startFastOtpChecker(chatId, phoneNumber) {
 
 
 // ===============================
-// APPS MENU BUILDER (Including Custom Admin Apps & Panel API)
+// APPS MENU BUILDER
 // ===============================
 async function showAppsMenu(chatId, messageId = null) {
     try {
         const isJoined = await checkChannelMember(chatId);
         if (!isJoined) {
+            const joinKeyboard = {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📢 Join OTP Group', url: `https://t.me/${config.REQUIRED_CHANNEL.replace('@','')}` }],
+                        [{ text: '📌 Join Method Group', url: `https://t.me/${METHOD_CHANNEL.replace('@','')}` }]
+                    ]
+                }
+            };
             await bot.sendMessage(
                 chatId,
                 `❌ *Please join both of our channels/groups first to use the bot.*\n\n` +
                 `1️⃣ OTP Group: ${config.REQUIRED_CHANNEL}\n` +
                 `2️⃣ Method Group: ${METHOD_CHANNEL}`,
-                { parse_mode: 'Markdown' }
+                { parse_mode: 'Markdown', ...joinKeyboard }
             );
             return;
         }
@@ -467,7 +473,7 @@ async function showAppsMenu(chatId, messageId = null) {
 
 
 // ===============================
-// MESSAGE HANDLER (Admin Panel & Withdraw Inputs)
+// MESSAGE HANDLER
 // ===============================
 
 bot.on('message', async (msg) => {
@@ -583,7 +589,7 @@ bot.on('message', async (msg) => {
 
 
 // ===============================
-// CALLBACK QUERY HANDLER (Admin & User Flow)
+// CALLBACK QUERY HANDLER
 // ===============================
 
 bot.on('callback_query', async (query) => {
