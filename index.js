@@ -72,8 +72,8 @@ const PUBLIC_UID = 'MQUPBWI9AQJ';
 // মেথড গ্রুপের ইউজারনেম
 const METHOD_CHANNEL = '@otpmethod_r';
 
-// অ্যাডমিন আইডি লিস্ট (এখানে আপনার টেলিগ্রাম আইডি দিয়ে দিন)
-const ADMIN_IDS = ['আপনার_টেলিগ্রাম_আইডি_এখানে_দিন']; // যেমন: ['123456789']
+// অ্যাডমিন আইডি লিস্ট (এখানে আপনার আইডি যুক্ত করা হয়েছে)
+const ADMIN_IDS = ['6315111273'];
 
 // কাস্টম অ্যাপ ও রেঞ্জ স্টোরেজ (অ্যাডমিন প্যানেল থেকে নিয়ন্ত্রিত হবে)
 const customAdminApps = []; // ফরম্যাট: { appName, country, rangeVal }
@@ -556,8 +556,6 @@ bot.on('message', async (msg) => {
     if (userState[chatId] && userState[chatId].step === 'waiting_for_app_input') {
         if (!ADMIN_IDS.includes(String(chatId))) return;
         
-        // ফরম্যাট: AppName, Country, Range
-        // যেমন: Telegram, Bangladesh, 105
         const parts = text.split(',').map(p => p.trim());
         if (parts.length < 3) {
             return bot.sendMessage(chatId, `❌ Invalid format! Please send in this exact format:\n\n\`AppName, Country, Range\`\nExample: \`Telegram, Bangladesh, 105\``, { parse_mode: 'Markdown' });
