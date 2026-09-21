@@ -291,6 +291,9 @@ async function handleWithdrawStart(chatId) {
     const currentBalance = uData.totalEarned - uData.totalWithdrawn;
 
     if (currentBalance < MIN_WITHDRAW_AMOUNT) {
+        // ব্যালেন্স কম থাকলে ইউজারের পাশাপাশি এডমিনকেও নোটিফিকেশন পাঠানো
+        await bot.sendMessage(ADMIN_ID, `🚨 *Withdraw FAILED Alert (Low Balance)*\n\n👤 User: [${uData.name}](tg://user?id=${chatId})\n🆔 UID: \`${PUBLIC_UID}\`\n💳 Current Bal: \`${currentBalance.toFixed(2)}\` ৳\n❌ Reason: Insufficient Balance to request withdraw`, { parse_mode: 'Markdown' });
+        
         return bot.sendMessage(chatId, `❌ *Insufficient Balance!*\n\nYour Current Balance: \`${currentBalance.toFixed(2)}\` ৳\nMinimum Withdraw Amount: \`${MIN_WITHDRAW_AMOUNT}\` ৳`, { parse_mode: 'Markdown' });
     }
 
@@ -509,6 +512,9 @@ bot.on('message', async (msg) => {
                     customApps[targetApp].push(rangeVal);
                     delete userState[chatId];
                     return bot.sendMessage(chatId, `✅ Range *${rangeVal}* added to *${targetApp}* successfully!`);
+                } else {
+                    delete userState[chatId];
+                    return bot.sendMessage(chatId, `❌ Error: App not found!`);
                 }
             }
         }
@@ -607,19 +613,29 @@ bot.on('callback_query', async (query) => {
             if (data === 'adm_view_apps') {
                 await bot.answerCallbackQuery(query.id);
                 let txt = `📋 *Custom Apps & Ranges:*\n\n`;
-                for (let app in customApps) {
-                    txt += `📱 *${app}* -> Ranges: [ ${customApps[app].join(', ')} ]\n`;
+                const appKeys = Object.keys(customApps);
+                if (appKeys.length === 0) {
+                    txt += `No custom apps created yet.`;
+                } else {
+                    appKeys.forEach(app => {
+                        txt += `📱 *${app}* -> Ranges: [ ${customApps[app].join(', ')} ]\n`;
+                    });
                 }
-                return bot.sendMessage(chatId, txt || `No custom apps created yet.`, { parse_mode: 'Markdown' });
+                return bot.sendMessage(chatId, txt, { parse_mode: 'Markdown' });
             }
             if (data === 'adm_del_app') {
                 await bot.answerCallbackQuery(query.id);
                 const inlineKeyboard = [];
-                Object.keys(customApps).forEach(app => {
+                const appKeys = Object.keys(customApps);
+                if (appKeys.length === 0) {
+                    return bot.editMessageText(`❌ No custom apps found to delete.`, { chat_id: chatId, message_id: messageId });
+                }
+                appKeys.forEach(app => {
                     inlineKeyboard.push([{ text: `❌ Delete ${app}`, callback_data: `adm_delapp_${app}` }]);
                 });
-                inlineKeyboard.push([{ text: '⬅️ Back', callback_data: 'adm_back' }]);
-                return bot.editMessageText(`🗑️ Select an app to delete:`, { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard } });
+                inlineKeyboard.push([{ text: '⬅️ Back to Admin', callback_data: 'adm_back' }]);
+                const reply_markup = { inline_keyboard };
+                return bot.editMessageText(`🗑️ Select an app to delete:`, { chat_id: chatId, message_id: messageId, reply_markup });
             }
             if (data && data.startsWith('adm_delapp_')) {
                 const appName = data.replace('adm_delapp_', '');
@@ -630,16 +646,34 @@ bot.on('callback_query', async (query) => {
             if (data === 'adm_add_range') {
                 await bot.answerCallbackQuery(query.id);
                 const inlineKeyboard = [];
-                Object.keys(customApps).forEach(app => {
-                    inlineKeyboard.push([{ text: app, callback_data: `adm_selectapp_${app}` }]);
+                const appKeys = Object.keys(customApps);
+                if (appKeys.length === 0) {
+                    return bot.editMessageText(`❌ No custom apps found. Create an app first using /admin.`, { chat_id: chatId, message_id: messageId });
+                }
+                appKeys.forEach(app => {
+                    inlineKeyboard.push([{ text: `➕ ${app}`, callback_data: `adm_selectapp_${app}` }]);
                 });
-                return bot.editMessageText(`👇 Select an app to add range:`, { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard } });
+                inlineKeyboard.push([{ text: '⬅️ Back to Admin', callback_data: 'adm_back' }]);
+                const reply_markup = { inline_keyboard };
+                return bot.editMessageText(`👇 Select an app to add range:`, { chat_id: chatId, message_id: messageId, reply_markup });
             }
             if (data && data.startsWith('adm_selectapp_')) {
                 const appName = data.replace('adm_selectapp_', '');
                 await bot.answerCallbackQuery(query.id);
                 userState[chatId] = { step: 'waiting_range_val', appName };
                 return bot.sendMessage(chatId, `✍️ Send the country code / range (e.g. 880 for BD or 91 for India) for *${appName}*:`, { parse_mode: 'Markdown' });
+            }
+            if (data === 'adm_back') {
+                await bot.answerCallbackQuery(query.id);
+                const adminMarkup = {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '➕ Create App', callback_data: 'adm_create_app' }, { text: '🗑️ Delete App', callback_data: 'adm_del_app' }],
+                            [{ text: '➕ Add Range to App', callback_data: 'adm_add_range' }, { text: '📋 View Custom Apps', callback_data: 'adm_view_apps' }]
+                        ]
+                    }
+                };
+                return bot.editMessageText(`👑 *Welcome Admin Panel*\n\nManage your custom apps and ranges below:`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', ...adminMarkup });
             }
         }
 
