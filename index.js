@@ -421,6 +421,7 @@ async function showAppsMenu(chatId, messageId = null) {
         const inlineKeyboard = [];
         let row = [];
 
+        // কাস্টম অ্যাপগুলো ড্যাশবোর্ডে যোগ করা
         Object.keys(customApps).forEach(appName => {
             row.push({
                 text: `⭐ ${appName}`,
@@ -615,6 +616,21 @@ bot.on('callback_query', async (query) => {
                 }
                 return bot.sendMessage(chatId, txt || `No custom apps created yet.`, { parse_mode: 'Markdown' });
             }
+            if (data === 'adm_del_app') {
+                await bot.answerCallbackQuery(query.id);
+                const inlineKeyboard = [];
+                Object.keys(customApps).forEach(app => {
+                    inlineKeyboard.push([{ text: `❌ Delete ${app}`, callback_data: `adm_delapp_${app}` }]);
+                });
+                inlineKeyboard.push([{ text: '⬅️ Back', callback_data: 'adm_back' }]);
+                return bot.editMessageText(`🗑️ Select an app to delete:`, { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard } });
+            }
+            if (data && data.startsWith('adm_delapp_')) {
+                const appName = data.replace('adm_delapp_', '');
+                delete customApps[appName];
+                await bot.answerCallbackQuery(query.id, { text: `Deleted ${appName}` });
+                return bot.editMessageText(`✅ App *${appName}* deleted successfully!`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' });
+            }
             if (data === 'adm_add_range') {
                 await bot.answerCallbackQuery(query.id);
                 const inlineKeyboard = [];
@@ -627,7 +643,7 @@ bot.on('callback_query', async (query) => {
                 const appName = data.replace('adm_selectapp_', '');
                 await bot.answerCallbackQuery(query.id);
                 userState[chatId] = { step: 'waiting_range_val', appName };
-                return bot.sendMessage(chatId, `✍️ Send the range code (e.g. 880 for Bangladesh or 91 for India) for *${appName}*:`, { parse_mode: 'Markdown' });
+                return bot.sendMessage(chatId, `✍️ Send the country code / range (e.g. 880 for BD or 91 for India) for *${appName}*:`, { parse_mode: 'Markdown' });
             }
         }
 
