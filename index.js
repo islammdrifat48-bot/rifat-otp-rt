@@ -1,4 +1,4 @@
-const TelegramBot = require('node-telegram-bot-api');
+Const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -19,7 +19,7 @@ const PUBLIC_UID = 'MQUPBWI9AQJ';
 const METHOD_CHANNEL = '@otpmethod_r';
 
 const MIN_WITHDRAW_AMOUNT = 500;
-const OTP_REWARD_AMOUNT = 0.70;
+const OTP_REWARD_AMOUNT = 0.50;
 
 const DATA_FILE = path.join(__dirname, 'bot-data.json');
 
@@ -197,21 +197,12 @@ function getCountryFlag(input) {
 }
 
 // =====================================================
-// PHONE MASK
+// PHONE MASK (Not used for full display, kept for reference)
 // =====================================================
 
 function maskPhoneNumber(number) {
     const value = String(number || '');
-
-    if (value.length <= 7) {
-        return value;
-    }
-
-    return (
-        value.slice(0, 4) +
-        '****' +
-        value.slice(-3)
-    );
+    return value; // পরিবর্তন: এখন সম্পূর্ণ নাম্বার রিটার্ন করবে
 }
 
 // =====================================================
@@ -994,12 +985,12 @@ function startFastOtpChecker(chatId, phoneNumber) {
                         userData.totalEarned += OTP_REWARD_AMOUNT;
                         saveDatabase();
 
-                        const maskedNumber = maskPhoneNumber(phoneNumber);
+                        const fullNumber = phoneNumber; // পরিবর্তন: পুরো নাম্বার
 
                         const otpMsg =
                             `🎉 *OTP Received Successfully!*\n\n` +
                             `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
-                            `📞 *Number:* \`${maskedNumber}\`\n` +
+                            `📞 *Number:* \`${fullNumber}\`\n` +
                             `💬 *Details:* \`${messageText}\`\n` +
                             `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
                             `✅ OTP successfully credited to your account!`;
@@ -1119,7 +1110,7 @@ async function allocateNumber(
             `🆔 UID: \`${PUBLIC_UID}\`\n` +
             `🎯 Service: \`${appName}\`\n` +
             `${getCountryFlag(country)} Country: \`${country}\`\n` +
-            `📞 Number: \`${maskPhoneNumber(number)}\`\n\n` +
+            `📞 Number: \`${number}\`\n\n` + // পরিবর্তন: এখানে maskPhoneNumber বাদ দিয়ে সরাসরি পূর্ণাঙ্গ number দেওয়া হয়েছে[span_0](start_span)[span_0](end_span)
             `✅ Status: *Number Allocated*\n` +
             `⏱️ Validity: *15 Minutes*\n\n` +
             `ℹ️ Waiting for incoming OTP automatically...`,
