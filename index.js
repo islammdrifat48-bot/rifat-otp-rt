@@ -72,38 +72,6 @@ const PUBLIC_UID = 'MQUPBWI9AQJ';
 const METHOD_CHANNEL = '@otpmethod_r';
 
 
-// =========================================================================
-// 🚀 কাস্টম অ্যাপ এবং রেঞ্জ কনফিগারেশন (নিজের ইচ্ছেমতো যত খুশি অ্যাড করুন)
-// =========================================================================
-const MY_CUSTOM_APPS_AND_RANGES = [
-    {
-        appName: 'Telegram', // অ্যাপের নাম
-        ranges: [
-            { country: 'Bangladesh', rangeVal: '105' },
-            { country: 'India', rangeVal: '205' },
-            { country: 'Pakistan', rangeVal: '305' }
-        ]
-    },
-    {
-        appName: 'WhatsApp', // আরেকটি অ্যাপ
-        ranges: [
-            { country: 'USA', rangeVal: '405' },
-            { country: 'UK', rangeVal: '505' }
-        ]
-    }
-    // আপনি চাইলে নিচে কমা দিয়ে নতুন অ্যাপ ও রেঞ্জ যোগ করতে পারেন:
-    /*
-    {
-        appName: 'TikTok',
-        ranges: [
-            { country: 'Canada', rangeVal: '605' }
-        ]
-    }
-    */
-];
-// =========================================================================
-
-
 function getUserData(userId) {
     if (!userBalance[userId]) {
         userBalance[userId] = {
@@ -379,7 +347,7 @@ async function startFastOtpChecker(chatId, phoneNumber) {
 
 
 // ===============================
-// STEP 1: APPS MENU BUILDER
+// STEP 1: APPS MENU BUILDER (100% LIVE FROM PANEL)
 // ===============================
 async function showAppsMenu(chatId, messageId = null) {
     try {
@@ -409,11 +377,6 @@ async function showAppsMenu(chatId, messageId = null) {
                 }
             });
         }
-
-        // কোডের উপরের কাস্টম অ্যাপগুলো লিস্টে যুক্ত করা
-        MY_CUSTOM_APPS_AND_RANGES.forEach(item => {
-            appsSet.add(item.appName);
-        });
 
         if (appsSet.size === 0) {
             const errText = '❌ No active services available from panel right now.';
@@ -468,7 +431,7 @@ async function showAppsMenu(chatId, messageId = null) {
 
 
 // ===============================
-// STEP 2: SHOW COUNTRIES FOR SELECTED APP
+// STEP 2: SHOW COUNTRIES FOR SELECTED APP (100% LIVE MATCHING)
 // ===============================
 async function showCountriesForApp(chatId, messageId, appName) {
     try {
@@ -485,7 +448,7 @@ async function showCountriesForApp(chatId, messageId, appName) {
                 const sName = String(service.sid || service.name || service.title || service.service || '').trim();
                 
                 if (sName.toLowerCase() === appName.toLowerCase()) {
-                    let country = service.country || service.country_name || service.location || service.region || appName;
+                    let country = service.country || service.country_name || service.location || service.region || 'Global';
                     const flag = getCountryFlag(country);
                     
                     let rangeVal = '';
@@ -508,23 +471,6 @@ async function showCountriesForApp(chatId, messageId, appName) {
                             row = [];
                         }
                     }
-                }
-            });
-        }
-
-        // কোডের উপরের কাস্টম অ্যাপ থেকে রেঞ্জগুলো যুক্ত করা
-        const customAppObj = MY_CUSTOM_APPS_AND_RANGES.find(item => item.appName.toLowerCase() === appName.toLowerCase());
-        if (customAppObj && customAppObj.ranges) {
-            customAppObj.ranges.forEach(rItem => {
-                const flag = getCountryFlag(rItem.country);
-                row.push({
-                    text: `${flag} ${rItem.country} (${rItem.rangeVal})`,
-                    callback_data: `num_${rItem.rangeVal}_${encodeURIComponent(appName)}`
-                });
-
-                if (row.length === 2) {
-                    inlineKeyboard.push(row);
-                    row = [];
                 }
             });
         }
