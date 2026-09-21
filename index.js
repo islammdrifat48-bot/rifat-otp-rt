@@ -1117,7 +1117,7 @@ async function allocateNumber(
             `🆔 UID: \`${PUBLIC_UID}\`\n` +
             `🎯 Service: \`${appName}\`\n` +
             `${getCountryFlag(country)} Country: \`${country}\`\n` +
-            `📞 Number: \`${maskPhoneNumber(number)}\`\n\n` +
+            `📞 Number: \`${number}\`\n\n` +
             `✅ Status: *Number Allocated*\n` +
             `⏱️ Validity: *15 Minutes*\n\n` +
             `ℹ️ Waiting for incoming OTP automatically...`,
