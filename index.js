@@ -994,15 +994,13 @@ function startFastOtpChecker(chatId, phoneNumber) {
                         userData.totalEarned += OTP_REWARD_AMOUNT;
                         saveDatabase();
 
-                        const maskedNumber = maskPhoneNumber(phoneNumber);
-
                         const otpMsg =
-                            `🎉 *OTP Received Successfully!*\n\n` +
-                            `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
-                            `📞 *Number:* \`${phoneNumber}\`\n` +
-                            `💬 *Details:* \`${messageText}\`\n` +
-                            `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
-                            `✅ OTP successfully credited to your account!`;
+    `🎉 *OTP Received Successfully!*\n\n` +
+    `🆔 *UID:* \`${PUBLIC_UID}\`\n` +
+    `📞 *Number:* \`${phoneNumber}\`\n` +
+    `💬 *Details:* \`${messageText}\`\n` +
+    `💰 *Reward Added:* +${OTP_REWARD_AMOUNT} ৳\n\n` +
+    `✅ OTP successfully credited to your account!`;
 
                         const otpKeyboard = {
                             reply_markup: {
