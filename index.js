@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
+const axios = require('axios'); // axios নিশ্চিত করা হলো
 
 const config = require('./config');
 const {
@@ -8,6 +9,28 @@ const {
     axiosInstance,
     getHeaders
 } = require('./api');
+
+// ===============================
+// FIXED: GET NEW NUMBER API FUNCTION
+// ===============================
+async function getNewNumber(rid) {
+    try {
+        const response = await axios.post(
+            'https://api.2oo9.cloud/MXS47FLFX8U/tnews/@public/api/getnum',
+            { rid: String(rid) },
+            {
+                headers: {
+                    'mauthapi': config.API_KEY || 'আপনার_এপিআই_কী_এখানে_দিন',
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('GetNewNumber API Error:', error.message);
+        return null;
+    }
+}
 
 // Bot initialization with explicit polling options and webhook disable
 const bot = new TelegramBot(config.BOT_TOKEN, {
@@ -312,7 +335,7 @@ async function sendLeaderboard(chatId) {
 
 
 // ===============================
-// SECURE SUCCESS OTP CHECKER (ORIGINAL & UNCHANGED)
+// SECURE SUCCESS OTP CHECKER
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber, userName = 'User') {
@@ -499,7 +522,7 @@ async function showAppsMenu(chatId, messageId = null) {
 
 
 // ===============================
-// STEP 2: SHOW COUNTRIES FOR API APP (FIXED ID EXTRACTION)
+// STEP 2: SHOW COUNTRIES FOR API APP
 // ===============================
 async function showCountriesForApp(chatId, messageId, appName) {
     try {
@@ -519,7 +542,6 @@ async function showCountriesForApp(chatId, messageId, appName) {
                     let country = service.country || service.country_name || service.location || service.region || appName;
                     const flag = getCountryFlag(country);
                     
-                    // নিখুতভাবে সঠিক আইডি বা রেঞ্জ পিক করা হচ্ছে
                     let rangeVal = '';
                     if (service.id !== undefined && service.id !== null) {
                         rangeVal = String(service.id);
@@ -983,7 +1005,6 @@ bot.on('callback_query', async (query) => {
         }
 
         if (data && data.startsWith('num_')) {
-            // সঠিক পেমেন্ট বা রেঞ্জ আইডি পার্স করার জন্য স্প্লিট হ্যান্ডেল করা হলো
             const parts = data.replace('num_', '').split('_');
             const targetRange = parts[0];
             const appName = decodeURIComponent(parts.slice(1).join('_') || 'Service');
