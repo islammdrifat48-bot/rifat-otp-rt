@@ -72,11 +72,12 @@ const PUBLIC_UID = 'MQUPBWI9AQJ';
 // মেথড গ্রুপের ইউজারনেম
 const METHOD_CHANNEL = '@otpmethod_r';
 
-// অ্যাডমিন আইডি লিস্ট (এখানে আপনার আইডি যুক্ত করা হয়েছে)
+// অ্যাডমিন আইডি লিস্ট
 const ADMIN_IDS = ['6315111273'];
 
-// কাস্টম অ্যাপ ও রেঞ্জ স্টোরেজ (অ্যাডমিন প্যানেল থেকে নিয়ন্ত্রিত হবে)
+// কাস্টম অ্যাপ ও রেঞ্জ স্টোরেজ
 const customAdminApps = []; // ফরম্যাট: { appName, country, rangeVal }
+const customAdminRanges = []; // ফরম্যাট: { rangeLabel }
 
 
 function getUserData(userId) {
@@ -167,28 +168,36 @@ async function checkChannelMember(userId) {
 
 
 // ===============================
-// MAIN MENU
+// MAIN MENU (WITH ADMIN PANEL BUTTON)
 // ===============================
 
-const mainMenu = {
-    reply_markup: {
-        keyboard: [
-            [
-                { text: '🟢 GET ACTIVE NUMBER' },
-                { text: '🟢 BALANCE' }
-            ],
-            [
-                { text: '🔵 REFER & EARN' },
-                { text: '🏆 LEADERBOARD' }
-            ],
-            [
-                { text: '🟢 SUPPORT' },
-                { text: '💸 WITHDRAW' }
-            ]
+function getMainMenuMarkup(userId) {
+    let keyboard = [
+        [
+            { text: '🟢 GET ACTIVE NUMBER' },
+            { text: '🟢 BALANCE' }
         ],
-        resize_keyboard: true
+        [
+            { text: '🔵 REFER & EARN' },
+            { text: '🏆 LEADERBOARD' }
+        ],
+        [
+            { text: '🟢 SUPPORT' },
+            { text: '💸 WITHDRAW' }
+        ]
+    ];
+
+    if (ADMIN_IDS.includes(String(userId))) {
+        keyboard.push([{ text: '🛠️ ADMIN PANEL' }]);
     }
-};
+
+    return {
+        reply_markup: {
+            keyboard: keyboard,
+            resize_keyboard: true
+        }
+    };
+}
 
 
 // ===============================
@@ -211,7 +220,7 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
             `📌 *Minimum Withdraw: 100 ৳*`,
             {
                 parse_mode: 'Markdown',
-                reply_markup: mainMenu.reply_markup
+                reply_markup: getMainMenuMarkup(chatId).reply_markup
             }
         );
     } catch (error) {
@@ -219,24 +228,40 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
     }
 });
 
-// অ্যাডমিন প্যানেল কমান্ড
-bot.onText(/^\/admin$/, async (msg) => {
-    const chatId = msg.chat.id;
+// অ্যাডমিন প্যানেল কমান্ড বা মেনু বাটন
+async function sendAdminPanel(chatId) {
     if (!ADMIN_IDS.includes(String(chatId))) {
         return bot.sendMessage(chatId, '❌ You are not authorized to use the admin panel.');
     }
 
     const adminKeyboard = {
         inline_keyboard: [
-            [{ text: '➕ Add Custom App/Range', callback_data: 'admin_add_app' }],
-            [{ text: '📋 View/Delete Custom Apps', callback_data: 'admin_list_apps' }]
+            [
+                { text: '➕ Add App', callback_data: 'admin_add_app' },
+                { text: '🗑️ Delete App', callback_data: 'admin_list_apps' }
+            ],
+            [
+                { text: '➕ Add Range', callback_data: 'admin_add_range' },
+                { text: '🗑️ Delete Range', callback_data: 'admin_list_ranges' }
+            ],
+            [
+                { text: '📱 App List', callback_data: 'admin_list_apps' },
+                { text: '📋 Range List', callback_data: 'admin_list_ranges' }
+            ],
+            [
+                { text: '🏠 Main Menu', callback_data: 'admin_main_menu' }
+            ]
         ]
     };
 
-    await bot.sendMessage(chatId, `🛠️ *Admin Control Panel*\n\nWelcome Admin! Manage your custom apps and ranges below:`, {
+    await bot.sendMessage(chatId, `🛠️ *Admin Control Panel*\n\nWelcome Admin! Manage your apps and ranges below:`, {
         parse_mode: 'Markdown',
         reply_markup: adminKeyboard
     });
+}
+
+bot.onText(/^\/admin$/, async (msg) => {
+    await sendAdminPanel(msg.chat.id);
 });
 
 
@@ -262,7 +287,7 @@ async function sendBalance(chatId) {
     try {
         await bot.sendMessage(chatId, balanceMsg, {
             parse_mode: 'Markdown',
-            reply_markup: mainMenu.reply_markup
+            reply_markup: getMainMenuMarkup(chatId).reply_markup
         });
     } catch (error) {
         console.error('Balance error:', error.message);
@@ -271,7 +296,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE SUCCESS OTP CHECKER (API Response Structure Matched)
+// SECURE SUCCESS OTP CHECKER
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
@@ -389,7 +414,6 @@ async function showAppsMenu(chatId, messageId = null) {
         const liveData = await getLiveAccess();
         const appsSet = new Set();
 
-        // এপিআই থেকে ডেটা লোড করা
         if (liveData && liveData.data) {
             const rawServices = liveData.data.services || liveData.data;
             const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
@@ -402,7 +426,6 @@ async function showAppsMenu(chatId, messageId = null) {
             });
         }
 
-        // অ্যাডমিন প্যানেল থেকে যোগ করা কাস্টম অ্যাপগুলো যুক্ত করা
         customAdminApps.forEach(item => {
             appsSet.add(item.appName);
         });
@@ -468,7 +491,6 @@ async function showCountriesForApp(chatId, messageId, appName) {
         const inlineKeyboard = [];
         let row = [];
 
-        // ১. এপিআই সার্ভিসের কান্ট্রি ও রেঞ্জ চেক
         if (liveData && liveData.data) {
             const rawServices = liveData.data.services || liveData.data;
             const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
@@ -505,12 +527,24 @@ async function showCountriesForApp(chatId, messageId, appName) {
             });
         }
 
-        // ২. অ্যাডমিন প্যানেল থেকে যোগ করা কাস্টম রেঞ্জগুলো যুক্ত করা
         customAdminApps.filter(item => item.appName.toLowerCase() === appName.toLowerCase()).forEach(item => {
             const flag = getCountryFlag(item.country);
             row.push({
                 text: `${flag} ${item.country} (${item.rangeVal})`,
                 callback_data: `num_${item.rangeVal}_${encodeURIComponent(appName)}`
+            });
+
+            if (row.length === 2) {
+                inlineKeyboard.push(row);
+                row = [];
+            }
+        });
+
+        // অ্যাডমিন প্যানেল থেকে যোগ করা ফ্রি রেঞ্জ লেবেলগুলো যুক্ত করা
+        customAdminRanges.forEach(rItem => {
+            row.push({
+                text: `🌐 ${rItem.rangeLabel}`,
+                callback_data: `num_${rItem.rangeLabel}_${encodeURIComponent(appName)}`
             });
 
             if (row.length === 2) {
@@ -552,7 +586,12 @@ bot.on('message', async (msg) => {
     if (text.startsWith('/start') || text.startsWith('/admin') || text.startsWith('/stat')) return;
     if (userLocks[chatId]) return;
 
-    // অ্যাডমিন যদি নতুন অ্যাপ যুক্ত করার প্রম্পটে থাকে
+    // অ্যাডমিন প্যানেল বাটন ক্লিক হ্যান্ডেল
+    if (text.includes('ADMIN PANEL')) {
+        return sendAdminPanel(chatId);
+    }
+
+    // অ্যাডমিন অ্যাপ ইনপুট প্রম্পট
     if (userState[chatId] && userState[chatId].step === 'waiting_for_app_input') {
         if (!ADMIN_IDS.includes(String(chatId))) return;
         
@@ -568,7 +607,18 @@ bot.on('message', async (msg) => {
         customAdminApps.push({ appName, country, rangeVal });
         delete userState[chatId];
 
-        return bot.sendMessage(chatId, `✅ *Successfully Added!*\n\nApp: \`${appName}\`\nCountry: \`${country}\`\nRange ID: \`${rangeVal}\``, { parse_mode: 'Markdown' });
+        return bot.sendMessage(chatId, `✅ *App Added Successfully!*\n\nApp: \`${appName}\`\nCountry: \`${country}\`\nRange: \`${rangeVal}\``, { parse_mode: 'Markdown' });
+    }
+
+    // অ্যাডমিন রেঞ্জ ইনপুট প্রম্পট
+    if (userState[chatId] && userState[chatId].step === 'waiting_for_range_input') {
+        if (!ADMIN_IDS.includes(String(chatId))) return;
+
+        const rangeLabel = text;
+        customAdminRanges.push({ rangeLabel });
+        delete userState[chatId];
+
+        return bot.sendMessage(chatId, `✅ *Range Added Successfully*\n\n📦 🌐/${rangeLabel}`, { parse_mode: 'Markdown' });
     }
 
     if (text.includes('BALANCE') || text.toLowerCase() === 'stat') {
@@ -604,12 +654,24 @@ bot.on('callback_query', async (query) => {
         const messageId = query.message.message_id;
         const data = query.data;
 
-        // অ্যাডমিন প্যানেল হ্যান্ডলার
+        // অ্যাডমিন প্যানেল বাটন অ্যাকশন
+        if (data === 'admin_main_menu') {
+            await bot.answerCallbackQuery(query.id);
+            return bot.sendMessage(chatId, '🏠 Main Menu', { reply_markup: getMainMenuMarkup(chatId).reply_markup });
+        }
+
         if (data === 'admin_add_app') {
             if (!ADMIN_IDS.includes(String(chatId))) return bot.answerCallbackQuery(query.id, { text: 'Unauthorized!' });
             userState[chatId] = { step: 'waiting_for_app_input' };
             await bot.answerCallbackQuery(query.id);
-            return bot.sendMessage(chatId, `➕ *Add Custom App & Range*\n\nPlease send the details in the following format:\n\n\`AppName, Country, RangeID\`\nExample: \`Telegram, Bangladesh, 105\``, { parse_mode: 'Markdown' });
+            return bot.sendMessage(chatId, `➕ *Add Custom App & Range*\n\nPlease send details in this format:\n\n\`AppName, Country, RangeID\`\nExample: \`Telegram, Bangladesh, 105\``, { parse_mode: 'Markdown' });
+        }
+
+        if (data === 'admin_add_range') {
+            if (!ADMIN_IDS.includes(String(chatId))) return bot.answerCallbackQuery(query.id, { text: 'Unauthorized!' });
+            userState[chatId] = { step: 'waiting_for_range_input' };
+            await bot.answerCallbackQuery(query.id);
+            return bot.sendMessage(chatId, `➕ *ADD RANGE LABEL*\n\nRange-এর label/value পাঠান।\nউদাহরণ:\nBD-01\n28892xxx`, { parse_mode: 'Markdown' });
         }
 
         if (data === 'admin_list_apps') {
@@ -633,6 +695,27 @@ bot.on('callback_query', async (query) => {
             });
         }
 
+        if (data === 'admin_list_ranges') {
+            if (!ADMIN_IDS.includes(String(chatId))) return bot.answerCallbackQuery(query.id, { text: 'Unauthorized!' });
+            await bot.answerCallbackQuery(query.id);
+
+            if (customAdminRanges.length === 0) {
+                return bot.sendMessage(chatId, '📂 No custom ranges added yet.');
+            }
+
+            let inlineKeyboard = [];
+            customAdminRanges.forEach((item, index) => {
+                inlineKeyboard.push([
+                    { text: `❌ Delete: ${item.rangeLabel}`, callback_data: `del_range_${index}` }
+                ]);
+            });
+
+            return bot.sendMessage(chatId, `📋 *Custom Ranges List*\nClick delete button to remove any range:`, {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: inlineKeyboard }
+            });
+        }
+
         if (data && data.startsWith('del_app_')) {
             if (!ADMIN_IDS.includes(String(chatId))) return bot.answerCallbackQuery(query.id, { text: 'Unauthorized!' });
             const index = parseInt(data.replace('del_app_', ''));
@@ -641,6 +724,17 @@ bot.on('callback_query', async (query) => {
                 const removed = customAdminApps.splice(index, 1);
                 await bot.answerCallbackQuery(query.id, { text: `Deleted ${removed[0].appName}!` });
                 return bot.editMessageText(`✅ Successfully deleted custom app!`, { chat_id: chatId, message_id: messageId });
+            }
+        }
+
+        if (data && data.startsWith('del_range_')) {
+            if (!ADMIN_IDS.includes(String(chatId))) return bot.answerCallbackQuery(query.id, { text: 'Unauthorized!' });
+            const index = parseInt(data.replace('del_range_', ''));
+            
+            if (!isNaN(index) && customAdminRanges[index]) {
+                const removed = customAdminRanges.splice(index, 1);
+                await bot.answerCallbackQuery(query.id, { text: `Deleted range!` });
+                return bot.editMessageText(`✅ Successfully deleted custom range!`, { chat_id: chatId, message_id: messageId });
             }
         }
 
