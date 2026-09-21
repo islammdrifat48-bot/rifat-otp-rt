@@ -72,6 +72,12 @@ const PUBLIC_UID = 'MQUPBWI9AQJ';
 // মেথড গ্রুপের ইউজারনেম
 const METHOD_CHANNEL = '@otpmethod_r';
 
+// অ্যাডমিন আইডি লিস্ট (এখানে আপনার টেলিগ্রাম আইডি দিয়ে দিন)
+const ADMIN_IDS = ['আপনার_টেলিগ্রাম_আইডি_এখানে_দিন']; // যেমন: ['123456789']
+
+// কাস্টম অ্যাপ ও রেঞ্জ স্টোরেজ (অ্যাডমিন প্যানেল থেকে নিয়ন্ত্রিত হবে)
+const customAdminApps = []; // ফরম্যাট: { appName, country, rangeVal }
+
 
 function getUserData(userId) {
     if (!userBalance[userId]) {
@@ -186,7 +192,7 @@ const mainMenu = {
 
 
 // ===============================
-// /START
+// /START & /ADMIN COMMAND
 // ===============================
 
 bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
@@ -211,6 +217,26 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
     } catch (error) {
         console.error('START SEND ERROR:', error.message);
     }
+});
+
+// অ্যাডমিন প্যানেল কমান্ড
+bot.onText(/^\/admin$/, async (msg) => {
+    const chatId = msg.chat.id;
+    if (!ADMIN_IDS.includes(String(chatId))) {
+        return bot.sendMessage(chatId, '❌ You are not authorized to use the admin panel.');
+    }
+
+    const adminKeyboard = {
+        inline_keyboard: [
+            [{ text: '➕ Add Custom App/Range', callback_data: 'admin_add_app' }],
+            [{ text: '📋 View/Delete Custom Apps', callback_data: 'admin_list_apps' }]
+        ]
+    };
+
+    await bot.sendMessage(chatId, `🛠️ *Admin Control Panel*\n\nWelcome Admin! Manage your custom apps and ranges below:`, {
+        parse_mode: 'Markdown',
+        reply_markup: adminKeyboard
+    });
 });
 
 
@@ -266,7 +292,6 @@ async function startFastOtpChecker(chatId, phoneNumber) {
         try {
             const otpResult = await getSuccessOtp();
             if (otpResult && otpResult.data) {
-                // ভোল্টেক্স এপিআই স্ট্রাকচার অনুযায়ী data.otps চেক করা হচ্ছে
                 const otpsList = otpResult.data.otps || otpResult.data.data || otpResult.data;
                 const items = Array.isArray(otpsList) ? otpsList : Object.values(otpsList);
 
@@ -362,30 +387,31 @@ async function showAppsMenu(chatId, messageId = null) {
         }
 
         const liveData = await getLiveAccess();
-        if (!liveData || !liveData.data) {
-            const errText = '❌ No active services available from panel right now.';
-            if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
-            return bot.sendMessage(chatId, errText);
-        }
-
-        // ভোল্টেক্স লাইভ এক্সেস রেসপন্স স্ট্রাকচার অনুযায়ী data.services পার্স করা
-        const rawServices = liveData.data.services || liveData.data;
-        const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
-
-        if (!items || items.length === 0) {
-            const errText = '❌ No active services available from panel right now.';
-            if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
-            return bot.sendMessage(chatId, errText);
-        }
-
         const appsSet = new Set();
-        items.forEach(service => {
-            if (!service) return;
-            const sName = service.sid || service.name || service.title || service.service || service.app_name;
-            if (sName) {
-                appsSet.add(String(sName).trim());
-            }
+
+        // এপিআই থেকে ডেটা লোড করা
+        if (liveData && liveData.data) {
+            const rawServices = liveData.data.services || liveData.data;
+            const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
+            items.forEach(service => {
+                if (!service) return;
+                const sName = service.sid || service.name || service.title || service.service || service.app_name;
+                if (sName) {
+                    appsSet.add(String(sName).trim());
+                }
+            });
+        }
+
+        // অ্যাডমিন প্যানেল থেকে যোগ করা কাস্টম অ্যাপগুলো যুক্ত করা
+        customAdminApps.forEach(item => {
+            appsSet.add(item.appName);
         });
+
+        if (appsSet.size === 0) {
+            const errText = '❌ No active services available from panel right now.';
+            if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
+            return bot.sendMessage(chatId, errText);
+        }
 
         const inlineKeyboard = [];
         let row = [];
@@ -404,7 +430,7 @@ async function showAppsMenu(chatId, messageId = null) {
             const icon = appIcons[cleanName.toLowerCase()] || '📱';
 
             row.push({
-                text: `${icon} ${cleanName}`,
+                text: `${icon}${cleanName}`,
                 callback_data: `app_${cleanName}`
             });
 
@@ -439,42 +465,57 @@ async function showAppsMenu(chatId, messageId = null) {
 async function showCountriesForApp(chatId, messageId, appName) {
     try {
         const liveData = await getLiveAccess();
-        if (!liveData || !liveData.data) return;
-
-        const rawServices = liveData.data.services || liveData.data;
-        const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
-
         const inlineKeyboard = [];
         let row = [];
 
-        items.forEach(service => {
-            if (!service) return;
-            const sName = String(service.sid || service.name || service.title || service.service || '').trim();
-            
-            if (sName.toLowerCase() === appName.toLowerCase()) {
-                let country = service.country || service.country_name || service.location || service.region || appName;
-                const flag = getCountryFlag(country);
+        // ১. এপিআই সার্ভিসের কান্ট্রি ও রেঞ্জ চেক
+        if (liveData && liveData.data) {
+            const rawServices = liveData.data.services || liveData.data;
+            const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
+
+            items.forEach(service => {
+                if (!service) return;
+                const sName = String(service.sid || service.name || service.title || service.service || '').trim();
                 
-                let rangeVal = '';
-                if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
-                    rangeVal = String(service.ranges[0]).replace(/[^0-9]/g, '');
-                } else if (service.range) {
-                    rangeVal = String(service.range).replace(/[^0-9]/g, '');
-                } else if (service.rid) {
-                    rangeVal = String(service.rid);
-                }
+                if (sName.toLowerCase() === appName.toLowerCase()) {
+                    let country = service.country || service.country_name || service.location || service.region || appName;
+                    const flag = getCountryFlag(country);
+                    
+                    let rangeVal = '';
+                    if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
+                        rangeVal = String(service.ranges[0]).replace(/[^0-9]/g, '');
+                    } else if (service.range) {
+                        rangeVal = String(service.range).replace(/[^0-9]/g, '');
+                    } else if (service.rid) {
+                        rangeVal = String(service.rid);
+                    }
 
-                if (rangeVal) {
-                    row.push({
-                        text: `${flag} ${country} (${rangeVal})`,
-                        callback_data: `num_${rangeVal}_${encodeURIComponent(appName)}`
-                    });
+                    if (rangeVal) {
+                        row.push({
+                            text: `${flag} ${country} (${rangeVal})`,
+                            callback_data: `num_${rangeVal}_${encodeURIComponent(appName)}`
+                        });
 
-                    if (row.length === 2) {
-                        inlineKeyboard.push(row);
-                        row = [];
+                        if (row.length === 2) {
+                            inlineKeyboard.push(row);
+                            row = [];
+                        }
                     }
                 }
+            });
+        }
+
+        // ২. অ্যাডমিন প্যানেল থেকে যোগ করা কাস্টম রেঞ্জগুলো যুক্ত করা
+        customAdminApps.filter(item => item.appName.toLowerCase() === appName.toLowerCase()).forEach(item => {
+            const flag = getCountryFlag(item.country);
+            row.push({
+                text: `${flag} ${item.country} (${item.rangeVal})`,
+                callback_data: `num_${item.rangeVal}_${encodeURIComponent(appName)}`
+            });
+
+            if (row.length === 2) {
+                inlineKeyboard.push(row);
+                row = [];
             }
         });
 
@@ -500,7 +541,7 @@ async function showCountriesForApp(chatId, messageId, appName) {
 
 
 // ===============================
-// MESSAGE HANDLER
+// MESSAGE HANDLER & ADMIN INPUT
 // ===============================
 
 bot.on('message', async (msg) => {
@@ -508,8 +549,29 @@ bot.on('message', async (msg) => {
     const text = msg.text ? msg.text.trim() : '';
 
     if (!text) return;
-    if (text.startsWith('/start') || text.startsWith('/stat')) return;
+    if (text.startsWith('/start') || text.startsWith('/admin') || text.startsWith('/stat')) return;
     if (userLocks[chatId]) return;
+
+    // অ্যাডমিন যদি নতুন অ্যাপ যুক্ত করার প্রম্পটে থাকে
+    if (userState[chatId] && userState[chatId].step === 'waiting_for_app_input') {
+        if (!ADMIN_IDS.includes(String(chatId))) return;
+        
+        // ফরম্যাট: AppName, Country, Range
+        // যেমন: Telegram, Bangladesh, 105
+        const parts = text.split(',').map(p => p.trim());
+        if (parts.length < 3) {
+            return bot.sendMessage(chatId, `❌ Invalid format! Please send in this exact format:\n\n\`AppName, Country, Range\`\nExample: \`Telegram, Bangladesh, 105\``, { parse_mode: 'Markdown' });
+        }
+
+        const appName = parts[0];
+        const country = parts[1];
+        const rangeVal = parts[2];
+
+        customAdminApps.push({ appName, country, rangeVal });
+        delete userState[chatId];
+
+        return bot.sendMessage(chatId, `✅ *Successfully Added!*\n\nApp: \`${appName}\`\nCountry: \`${country}\`\nRange ID: \`${rangeVal}\``, { parse_mode: 'Markdown' });
+    }
 
     if (text.includes('BALANCE') || text.toLowerCase() === 'stat') {
         return sendBalance(chatId);
@@ -544,6 +606,46 @@ bot.on('callback_query', async (query) => {
         const messageId = query.message.message_id;
         const data = query.data;
 
+        // অ্যাডমিন প্যানেল হ্যান্ডলার
+        if (data === 'admin_add_app') {
+            if (!ADMIN_IDS.includes(String(chatId))) return bot.answerCallbackQuery(query.id, { text: 'Unauthorized!' });
+            userState[chatId] = { step: 'waiting_for_app_input' };
+            await bot.answerCallbackQuery(query.id);
+            return bot.sendMessage(chatId, `➕ *Add Custom App & Range*\n\nPlease send the details in the following format:\n\n\`AppName, Country, RangeID\`\nExample: \`Telegram, Bangladesh, 105\``, { parse_mode: 'Markdown' });
+        }
+
+        if (data === 'admin_list_apps') {
+            if (!ADMIN_IDS.includes(String(chatId))) return bot.answerCallbackQuery(query.id, { text: 'Unauthorized!' });
+            await bot.answerCallbackQuery(query.id);
+
+            if (customAdminApps.length === 0) {
+                return bot.sendMessage(chatId, '📂 No custom apps added yet.');
+            }
+
+            let inlineKeyboard = [];
+            customAdminApps.forEach((item, index) => {
+                inlineKeyboard.push([
+                    { text: `❌ Delete: ${item.appName} (${item.country})`, callback_data: `del_app_${index}` }
+                ]);
+            });
+
+            return bot.sendMessage(chatId, `📋 *Custom Apps List*\nClick delete button to remove any app:`, {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: inlineKeyboard }
+            });
+        }
+
+        if (data && data.startsWith('del_app_')) {
+            if (!ADMIN_IDS.includes(String(chatId))) return bot.answerCallbackQuery(query.id, { text: 'Unauthorized!' });
+            const index = parseInt(data.replace('del_app_', ''));
+            
+            if (!isNaN(index) && customAdminApps[index]) {
+                const removed = customAdminApps.splice(index, 1);
+                await bot.answerCallbackQuery(query.id, { text: `Deleted ${removed[0].appName}!` });
+                return bot.editMessageText(`✅ Successfully deleted custom app!`, { chat_id: chatId, message_id: messageId });
+            }
+        }
+
         if (data === 'back_to_apps') {
             await bot.answerCallbackQuery(query.id);
             return showAppsMenu(chatId, messageId);
@@ -563,7 +665,6 @@ bot.on('callback_query', async (query) => {
             await bot.answerCallbackQuery(query.id, { text: 'Allocating number...' });
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId });
 
-            // getNewNumber এপিআই কল (রেন্ডার লগ অনুযায়ী ফাংশনটি এখন সরাসরি এক্সিকিউট হবে)
             const actualNumResult = await getNewNumber(targetRange);
             
             if (!actualNumResult || !actualNumResult.data) {
@@ -575,7 +676,6 @@ bot.on('callback_query', async (query) => {
             const finalCountry = phoneData.country || phoneData.country_name || 'Global';
             const flagEmoji = getCountryFlag(finalCountry);
 
-            // অটো ওটিপি ট্র্যাকার চালু করা হলো
             startFastOtpChecker(chatId, phoneNumber);
 
             const numberKeyboard = {
