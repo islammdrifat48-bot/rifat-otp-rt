@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
-const axios = require('axios'); // axios নিশ্চিত করা হলো
+const axios = require('axios');
 
 const config = require('./config');
 const {
@@ -458,6 +458,7 @@ async function showAppsMenu(chatId, messageId = null) {
             'discord': '🎮'
         };
 
+        // প্রথমে কাস্টম অ্যাপগুলো যোগ করা হচ্ছে
         Object.keys(customAppsData).forEach(appName => {
             const cleanName = String(appName).trim();
             const icon = appIcons[cleanName.toLowerCase()] || '🚀';
@@ -473,28 +474,33 @@ async function showAppsMenu(chatId, messageId = null) {
             }
         });
 
+        // এরপর লাইভ API থেকে সার্ভিস ফেচ করে অ্যাপস মেনু তৈরি করা হচ্ছে
         try {
             const liveData = await getLiveAccess();
             const rawServices = liveData?.data?.services || liveData?.data || [];
             const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
 
+            const appsSet = new Set();
             items.forEach(service => {
                 if (!service) return;
                 const sName = service.sid || service.name || service.title || service.service || service.app_name;
                 if (sName) {
-                    const cleanName = String(sName).trim();
-                    if (!customAppsData[cleanName]) {
-                        const icon = appIcons[cleanName.toLowerCase()] || '📱';
+                    appsSet.add(String(sName).trim());
+                }
+            });
 
-                        row.push({
-                            text: `${icon}${cleanName}`,
-                            callback_data: `app_${cleanName}`
-                        });
+            appsSet.forEach(cleanName => {
+                if (!customAppsData[cleanName]) {
+                    const icon = appIcons[cleanName.toLowerCase()] || '📱';
 
-                        if (row.length === 2) {
-                            inlineKeyboard.push(row);
-                            row = [];
-                        }
+                    row.push({
+                        text: `${icon}${cleanName}`,
+                        callback_data: `app_${cleanName}`
+                    });
+
+                    if (row.length === 2) {
+                        inlineKeyboard.push(row);
+                        row = [];
                     }
                 }
             });
@@ -543,14 +549,14 @@ async function showCountriesForApp(chatId, messageId, appName) {
                     const flag = getCountryFlag(country);
                     
                     let rangeVal = '';
-                    if (service.id !== undefined && service.id !== null) {
-                        rangeVal = String(service.id);
+                    if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
+                        rangeVal = String(service.ranges[0]).replace(/[^0-9]/g, '');
+                    } else if (service.range !== undefined && service.range !== null) {
+                        rangeVal = String(service.range).replace(/[^0-9]/g, '');
                     } else if (service.rid !== undefined && service.rid !== null) {
                         rangeVal = String(service.rid);
-                    } else if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
-                        rangeVal = String(service.ranges[0]);
-                    } else if (service.range !== undefined && service.range !== null) {
-                        rangeVal = String(service.range);
+                    } else if (service.id !== undefined && service.id !== null) {
+                        rangeVal = String(service.id);
                     }
 
                     if (rangeVal) {
