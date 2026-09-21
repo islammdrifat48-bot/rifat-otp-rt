@@ -1,4 +1,4 @@
-const TelegramBot = require('node-telegram-bot-api');
+TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 
 const config = require('./config');
@@ -63,6 +63,7 @@ const userState = {};
 const userBalance = {};
 const processedOtps = new Set();
 
+const MIN_WITHDRAW_AMOUNT = 100.00;
 const OTP_REWARD_AMOUNT = 0.70;
 
 // পাবলিক ইউআইডি (UID) কনফিগারেশন
@@ -163,33 +164,29 @@ async function checkChannelMember(userId) {
 // MAIN MENU
 // ===============================
 
-function getMainMenuMarkup(userId) {
-    let keyboard = [
-        [
-            { text: '🟢 GET ACTIVE NUMBER' },
-            { text: '🟢 BALANCE' }
+const mainMenu = {
+    reply_markup: {
+        keyboard: [
+            [
+                { text: '🟢 GET ACTIVE NUMBER' },
+                { text: '🟢 BALANCE' }
+            ],
+            [
+                { text: '🔵 REFER & EARN' },
+                { text: '🏆 LEADERBOARD' }
+            ],
+            [
+                { text: '🟢 SUPPORT' },
+                { text: '💸 WITHDRAW' }
+            ]
         ],
-        [
-            { text: '🔵 REFER & EARN' },
-            { text: '🏆 LEADERBOARD' }
-        ],
-        [
-            { text: '🟢 SUPPORT' },
-            { text: '💸 WITHDRAW' }
-        ]
-    ];
-
-    return {
-        reply_markup: {
-            keyboard: keyboard,
-            resize_keyboard: true
-        }
-    };
-}
+        resize_keyboard: true
+    }
+};
 
 
 // ===============================
-// /START COMMAND
+// /START
 // ===============================
 
 bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
@@ -208,7 +205,7 @@ bot.onText(/^\/start(?:@\w+)?$/, async (msg) => {
             `📌 *Minimum Withdraw: 100 ৳*`,
             {
                 parse_mode: 'Markdown',
-                reply_markup: getMainMenuMarkup(chatId).reply_markup
+                reply_markup: mainMenu.reply_markup
             }
         );
     } catch (error) {
@@ -239,7 +236,7 @@ async function sendBalance(chatId) {
     try {
         await bot.sendMessage(chatId, balanceMsg, {
             parse_mode: 'Markdown',
-            reply_markup: getMainMenuMarkup(chatId).reply_markup
+            reply_markup: mainMenu.reply_markup
         });
     } catch (error) {
         console.error('Balance error:', error.message);
@@ -248,7 +245,7 @@ async function sendBalance(chatId) {
 
 
 // ===============================
-// SECURE SUCCESS OTP CHECKER (SAFE & UNTOUCHED)
+// SECURE SUCCESS OTP CHECKER (API Response Structure Matched)
 // ===============================
 
 async function startFastOtpChecker(chatId, phoneNumber) {
@@ -269,6 +266,7 @@ async function startFastOtpChecker(chatId, phoneNumber) {
         try {
             const otpResult = await getSuccessOtp();
             if (otpResult && otpResult.data) {
+                // ভোল্টেক্স এপিআই স্ট্রাকচার অনুযায়ী data.otps চেক করা হচ্ছে
                 const otpsList = otpResult.data.otps || otpResult.data.data || otpResult.data;
                 const items = Array.isArray(otpsList) ? otpsList : Object.values(otpsList);
 
@@ -347,7 +345,7 @@ async function startFastOtpChecker(chatId, phoneNumber) {
 
 
 // ===============================
-// STEP 1: APPS MENU BUILDER (100% LIVE FROM PANEL)
+// STEP 1: APPS MENU BUILDER
 // ===============================
 async function showAppsMenu(chatId, messageId = null) {
     try {
@@ -364,25 +362,30 @@ async function showAppsMenu(chatId, messageId = null) {
         }
 
         const liveData = await getLiveAccess();
-        const appsSet = new Set();
-
-        if (liveData && liveData.data) {
-            const rawServices = liveData.data.services || liveData.data;
-            const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
-            items.forEach(service => {
-                if (!service) return;
-                const sName = service.sid || service.name || service.title || service.service || service.app_name;
-                if (sName) {
-                    appsSet.add(String(sName).trim());
-                }
-            });
-        }
-
-        if (appsSet.size === 0) {
+        if (!liveData || !liveData.data) {
             const errText = '❌ No active services available from panel right now.';
             if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
             return bot.sendMessage(chatId, errText);
         }
+
+        // ভোল্টেক্স লাইভ এক্সেস রেসপন্স স্ট্রাকচার অনুযায়ী data.services পার্স করা
+        const rawServices = liveData.data.services || liveData.data;
+        const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
+
+        if (!items || items.length === 0) {
+            const errText = '❌ No active services available from panel right now.';
+            if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
+            return bot.sendMessage(chatId, errText);
+        }
+
+        const appsSet = new Set();
+        items.forEach(service => {
+            if (!service) return;
+            const sName = service.sid || service.name || service.title || service.service || service.app_name;
+            if (sName) {
+                appsSet.add(String(sName).trim());
+            }
+        });
 
         const inlineKeyboard = [];
         let row = [];
@@ -431,49 +434,49 @@ async function showAppsMenu(chatId, messageId = null) {
 
 
 // ===============================
-// STEP 2: SHOW COUNTRIES FOR SELECTED APP (100% LIVE MATCHING)
+// STEP 2: SHOW COUNTRIES FOR SELECTED APP
 // ===============================
 async function showCountriesForApp(chatId, messageId, appName) {
     try {
         const liveData = await getLiveAccess();
+        if (!liveData || !liveData.data) return;
+
+        const rawServices = liveData.data.services || liveData.data;
+        const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
+
         const inlineKeyboard = [];
         let row = [];
 
-        if (liveData && liveData.data) {
-            const rawServices = liveData.data.services || liveData.data;
-            const items = Array.isArray(rawServices) ? rawServices : Object.values(rawServices);
-
-            items.forEach(service => {
-                if (!service) return;
-                const sName = String(service.sid || service.name || service.title || service.service || '').trim();
+        items.forEach(service => {
+            if (!service) return;
+            const sName = String(service.sid || service.name || service.title || service.service || '').trim();
+            
+            if (sName.toLowerCase() === appName.toLowerCase()) {
+                let country = service.country || service.country_name || service.location || service.region || appName;
+                const flag = getCountryFlag(country);
                 
-                if (sName.toLowerCase() === appName.toLowerCase()) {
-                    let country = service.country || service.country_name || service.location || service.region || 'Global';
-                    const flag = getCountryFlag(country);
-                    
-                    let rangeVal = '';
-                    if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
-                        rangeVal = String(service.ranges[0]).replace(/[^0-9]/g, '');
-                    } else if (service.range) {
-                        rangeVal = String(service.range).replace(/[^0-9]/g, '');
-                    } else if (service.rid) {
-                        rangeVal = String(service.rid);
-                    }
+                let rangeVal = '';
+                if (service.ranges && Array.isArray(service.ranges) && service.ranges.length > 0) {
+                    rangeVal = String(service.ranges[0]).replace(/[^0-9]/g, '');
+                } else if (service.range) {
+                    rangeVal = String(service.range).replace(/[^0-9]/g, '');
+                } else if (service.rid) {
+                    rangeVal = String(service.rid);
+                }
 
-                    if (rangeVal) {
-                        row.push({
-                            text: `${flag} ${country} (${rangeVal})`,
-                            callback_data: `num_${rangeVal}_${encodeURIComponent(appName)}`
-                        });
+                if (rangeVal) {
+                    row.push({
+                        text: `${flag} ${country} (${rangeVal})`,
+                        callback_data: `num_${rangeVal}_${encodeURIComponent(appName)}`
+                    });
 
-                        if (row.length === 2) {
-                            inlineKeyboard.push(row);
-                            row = [];
-                        }
+                    if (row.length === 2) {
+                        inlineKeyboard.push(row);
+                        row = [];
                     }
                 }
-            });
-        }
+            }
+        });
 
         if (row.length > 0) {
             inlineKeyboard.push(row);
@@ -560,6 +563,7 @@ bot.on('callback_query', async (query) => {
             await bot.answerCallbackQuery(query.id, { text: 'Allocating number...' });
             await bot.editMessageText('⏳ Allocating fresh number from panel...', { chat_id: chatId, message_id: messageId });
 
+            // getNewNumber এপিআই কল (রেন্ডার লগ অনুযায়ী ফাংশনটি এখন সরাসরি এক্সিকিউট হবে)
             const actualNumResult = await getNewNumber(targetRange);
             
             if (!actualNumResult || !actualNumResult.data) {
@@ -571,6 +575,7 @@ bot.on('callback_query', async (query) => {
             const finalCountry = phoneData.country || phoneData.country_name || 'Global';
             const flagEmoji = getCountryFlag(finalCountry);
 
+            // অটো ওটিপি ট্র্যাকার চালু করা হলো
             startFastOtpChecker(chatId, phoneNumber);
 
             const numberKeyboard = {
