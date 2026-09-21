@@ -58,7 +58,6 @@ bot.getMe()
 // USER DATA, SECURITY & CUSTOM APPS MAP
 // ===============================
 
-const userLocks = {};
 const userState = {};
 const userBalance = {};
 const processedOtps = new Set();
@@ -291,7 +290,6 @@ async function handleWithdrawStart(chatId) {
     const currentBalance = uData.totalEarned - uData.totalWithdrawn;
 
     if (currentBalance < MIN_WITHDRAW_AMOUNT) {
-        // ব্যালেন্স কম থাকলে ইউজারের পাশাপাশি এডমিনকেও নোটিফিকেশন পাঠানো
         await bot.sendMessage(ADMIN_ID, `🚨 *Withdraw FAILED Alert (Low Balance)*\n\n👤 User: [${uData.name}](tg://user?id=${chatId})\n🆔 UID: \`${PUBLIC_UID}\`\n💳 Current Bal: \`${currentBalance.toFixed(2)}\` ৳\n❌ Reason: Insufficient Balance to request withdraw`, { parse_mode: 'Markdown' });
         
         return bot.sendMessage(chatId, `❌ *Insufficient Balance!*\n\nYour Current Balance: \`${currentBalance.toFixed(2)}\` ৳\nMinimum Withdraw Amount: \`${MIN_WITHDRAW_AMOUNT}\` ৳`, { parse_mode: 'Markdown' });
@@ -420,7 +418,6 @@ async function showAppsMenu(chatId, messageId = null) {
         const inlineKeyboard = [];
         let row = [];
 
-        // কাস্টম অ্যাপগুলো ড্যাশবোর্ডে যোগ করা
         Object.keys(customApps).forEach(appName => {
             row.push({
                 text: `⭐ ${appName}`,
@@ -634,8 +631,12 @@ bot.on('callback_query', async (query) => {
                     inlineKeyboard.push([{ text: `❌ Delete ${app}`, callback_data: `adm_delapp_${app}` }]);
                 });
                 inlineKeyboard.push([{ text: '⬅️ Back to Admin', callback_data: 'adm_back' }]);
-                const reply_markup = { inline_keyboard };
-                return bot.editMessageText(`🗑️ Select an app to delete:`, { chat_id: chatId, message_id: messageId, reply_markup });
+                
+                return bot.editMessageText(`🗑️ Select an app to delete:`, { 
+                    chat_id: chatId, 
+                    message_id: messageId, 
+                    reply_markup: { inline_keyboard } 
+                });
             }
             if (data && data.startsWith('adm_delapp_')) {
                 const appName = data.replace('adm_delapp_', '');
@@ -654,8 +655,12 @@ bot.on('callback_query', async (query) => {
                     inlineKeyboard.push([{ text: `➕ ${app}`, callback_data: `adm_selectapp_${app}` }]);
                 });
                 inlineKeyboard.push([{ text: '⬅️ Back to Admin', callback_data: 'adm_back' }]);
-                const reply_markup = { inline_keyboard };
-                return bot.editMessageText(`👇 Select an app to add range:`, { chat_id: chatId, message_id: messageId, reply_markup });
+                
+                return bot.editMessageText(`👇 Select an app to add range:`, { 
+                    chat_id: chatId, 
+                    message_id: messageId, 
+                    reply_markup: { inline_keyboard } 
+                });
             }
             if (data && data.startsWith('adm_selectapp_')) {
                 const appName = data.replace('adm_selectapp_', '');
@@ -666,12 +671,10 @@ bot.on('callback_query', async (query) => {
             if (data === 'adm_back') {
                 await bot.answerCallbackQuery(query.id);
                 const adminMarkup = {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '➕ Create App', callback_data: 'adm_create_app' }, { text: '🗑️ Delete App', callback_data: 'adm_del_app' }],
-                            [{ text: '➕ Add Range to App', callback_data: 'adm_add_range' }, { text: '📋 View Custom Apps', callback_data: 'adm_view_apps' }]
-                        ]
-                    }
+                    inline_keyboard: [
+                        [{ text: '➕ Create App', callback_data: 'adm_create_app' }, { text: '🗑️ Delete App', callback_data: 'adm_del_app' }],
+                        [{ text: '➕ Add Range to App', callback_data: 'adm_add_range' }, { text: '📋 View Custom Apps', callback_data: 'adm_view_apps' }]
+                    ]
                 };
                 return bot.editMessageText(`👑 *Welcome Admin Panel*\n\nManage your custom apps and ranges below:`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', ...adminMarkup });
             }
@@ -715,7 +718,7 @@ bot.on('callback_query', async (query) => {
             if (row.length > 0) inlineKeyboard.push(row);
             inlineKeyboard.push([{ text: '⬅️ Back to Apps Menu', callback_data: 'back_to_apps' }]);
 
-            const reply_markup = { inline_keyboard: inlineKeyboard };
+            const reply_markup = { inline_keyboard };
             return bot.editMessageText(`⭐ *App:* \`${appName}\`\n\n👇 Select range below:`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup });
         }
 
@@ -764,7 +767,7 @@ bot.on('callback_query', async (query) => {
             if (row.length > 0) inlineKeyboard.push(row);
             inlineKeyboard.push([{ text: '⬅️ Back to Apps Menu', callback_data: 'back_to_apps' }]);
 
-            const reply_markup = { inline_keyboard: inlineKeyboard };
+            const reply_markup = { inline_keyboard };
             return bot.editMessageText(`📱 *App:* \`${appName}\`\n\n👇 Select country/range below:`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup });
         }
 
