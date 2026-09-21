@@ -400,20 +400,16 @@ async function showAppsMenu(chatId, messageId = null) {
     try {
         const isJoined = await checkChannelMember(chatId);
         if (!isJoined) {
-            const joinKeyboard = {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '📢 Join OTP Group', url: `https://t.me/${config.REQUIRED_CHANNEL.replace('@','')}` }],
-                        [{ text: '📌 Join Method Group', url: `https://t.me/${METHOD_CHANNEL.replace('@','')}` }]
-                    ]
-                }
-            };
+            const joinKeyboard = [
+                [{ text: '📢 Join OTP Group', url: `https://t.me/${config.REQUIRED_CHANNEL.replace('@','')}` }],
+                [{ text: '📌 Join Method Group', url: `https://t.me/${METHOD_CHANNEL.replace('@','')}` }]
+            ];
             await bot.sendMessage(
                 chatId,
                 `❌ *Please join both of our channels/groups first to use the bot.*\n\n` +
                 `1️⃣ OTP Group: ${config.REQUIRED_CHANNEL}\n` +
                 `2️⃣ Method Group: ${METHOD_CHANNEL}`,
-                { parse_mode: 'Markdown', ...joinKeyboard }
+                { parse_mode: 'Markdown', reply_markup: { inline_keyboard: joinKeyboard } }
             );
             return;
         }
@@ -685,7 +681,8 @@ bot.on('callback_query', async (query) => {
             if (row.length > 0) inlineKeyboard.push(row);
             inlineKeyboard.push([{ text: '⬅️ Back to Apps Menu', callback_data: 'back_to_apps' }]);
 
-            return bot.editMessageText(`⭐ *App:* \`${appName}\`\n\n👇 Select range below:`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: { inline_keyboard } });
+            const reply_markup = { inline_keyboard: inlineKeyboard };
+            return bot.editMessageText(`⭐ *App:* \`${appName}\`\n\n👇 Select range below:`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup });
         }
 
         if (data && data.startsWith('app_')) {
@@ -733,7 +730,8 @@ bot.on('callback_query', async (query) => {
             if (row.length > 0) inlineKeyboard.push(row);
             inlineKeyboard.push([{ text: '⬅️ Back to Apps Menu', callback_data: 'back_to_apps' }]);
 
-            return bot.editMessageText(`📱 *App:* \`${appName}\`\n\n👇 Select country/range below:`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: { inline_keyboard } });
+            const reply_markup = { inline_keyboard: inlineKeyboard };
+            return bot.editMessageText(`📱 *App:* \`${appName}\`\n\n👇 Select country/range below:`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup });
         }
 
         if (data && data.startsWith('num_')) {
@@ -757,15 +755,13 @@ bot.on('callback_query', async (query) => {
 
             startFastOtpChecker(chatId, phoneNumber);
 
-            const numberKeyboard = {
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            { text: '🔄 Change Number', callback_data: `num_${targetRange}_${encodeURIComponent(appName)}` },
-                            { text: '⬅️ Back to Countries', callback_data: `app_${appName}` }
-                        ]
+            const reply_markup = {
+                inline_keyboard: [
+                    [
+                        { text: '🔄 Change Number', callback_data: `num_${targetRange}_${encodeURIComponent(appName)}` },
+                        { text: '⬅️ Back to Countries', callback_data: `app_${appName}` }
                     ]
-                }
+                ]
             };
 
             return bot.editMessageText(
@@ -776,7 +772,7 @@ bot.on('callback_query', async (query) => {
                 `📞 *Number:* \`${phoneNumber}\`\n\n` +
                 `✅ *Status:* Active Number Allocated\n` +
                 `⏰ *Validity:* 15 Minutes`,
-                { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', ...numberKeyboard }
+                { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup }
             );
         }
     } catch (error) {
